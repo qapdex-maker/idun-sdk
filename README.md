@@ -103,13 +103,13 @@ Point an MCP client at the GitMCP URL to give it live access to this repo's
 docs + code (prefers `llms.txt`):
 
 ```
-https://gitmcp.io/qapdex-maker/idun-sdk
+https://gitmcp.io/qapdex-maker/idun-sdk/sse
 ```
 
 For stdio-only clients (Claude Desktop, Cline, Msty):
 
 ```json
-{ "mcpServers": { "idun-docs": { "command": "npx", "args": ["mcp-remote", "https://gitmcp.io/qapdex-maker/idun-sdk"] } } }
+{ "mcpServers": { "idun-docs": { "command": "npx", "args": ["mcp-remote", "https://gitmcp.io/qapdex-maker/idun-sdk/sse"] } } }
 ```
 
 **Recommended combo for a foreign agent:** both `idun` (calls the agent) and
