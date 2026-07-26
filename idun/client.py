@@ -102,15 +102,21 @@ class IdunClient:
             raise RuntimeError("No FOUNDRY_TOKEN set. Run `idun login` or export FOUNDRY_TOKEN.")
         return {"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"}
 
-    def complete(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
-        """Synchronous completion. Returns final text + agent trajectory."""
-        # model MUST be "model-router" when agent is in the URL.
-        # Do NOT send a "tools" key (agent owns its capabilities -> 400 invalid_payload).
-        payload = {
+    def _build_payload(self, prompt: str, max_output_tokens: int = 4096) -> dict:
+        """Verified working request shape for the agent-in-URL endpoint.
+
+        Model MUST stay 'model-router' (agent name -> invalid_payload).
+        No 'tools' key (agent owns capabilities -> 400 invalid_payload).
+        """
+        return {
             "model": "model-router",
             "input": prompt,
             "max_output_tokens": max_output_tokens,
         }
+
+    def complete(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
+        """Synchronous completion. Returns final text + agent trajectory."""
+        payload = self._build_payload(prompt, max_output_tokens)
         req = urllib.request.Request(
             self._url(), data=json.dumps(payload).encode("utf-8"),
             headers=self._headers(), method="POST",

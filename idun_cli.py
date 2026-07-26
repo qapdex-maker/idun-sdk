@@ -53,9 +53,9 @@ def cmd_trace(args):
     print(res.text)
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI")
-    sub = p.add_subparsers(dest="cmd", required=True)
+    sub = p.add_subparsers(dest="command", required=True)
 
     sub.add_parser("login", help="device-code Entra login").set_defaults(func=cmd_login)
 
@@ -68,8 +68,11 @@ def main():
     pt.add_argument("prompt")
     pt.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
     pt.set_defaults(func=cmd_trace)
+    return p
 
-    args = p.parse_args()
+
+def main():
+    args = build_parser().parse_args()
     args.func(args)
 
 
