@@ -46,7 +46,7 @@ else
 fi
 
 # 3) CLI subcommands
-if python3 -m idun_cli --help >"$PREFIX/help.out" 2>&1 && \
+if ( cd "$SDK_DIR" && python3 -m idun_cli --help >"$PREFIX/help.out" 2>&1 ) && \
    grep -q "login" "$PREFIX/help.out" && grep -q "chat" "$PREFIX/help.out" && grep -q "trace" "$PREFIX/help.out"; then
   ok "CLI exposes login/chat/trace"
 else
@@ -54,7 +54,7 @@ else
 fi
 
 # 4) importable package
-if python3 -c "import idun; assert idun.__version__=='0.1.0'" >/dev/null 2>&1; then
+if ( cd "$SDK_DIR" && python3 -c "import idun; assert idun.__version__=='0.1.0'" ) >/dev/null 2>&1; then
   ok "package importable as idun (v0.1.0)"
 else
   bad "package not importable"
