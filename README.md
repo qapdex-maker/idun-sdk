@@ -68,3 +68,53 @@ Notes:
 - `idun/client.py` — `IdunClient` (sync `complete()`) + `_normalize_output()`
 - `idun/auth.py` — stdlib device-code `login()` + `load_token()`
 - `idun_cli.py` — `idun login | chat | trace`
+
+## MCP — agent + docs
+
+Idun is available as an MCP server **and** has a GitMCP docs mirror, so other
+agents can both call Idun and read its documentation without hallucinating.
+
+### 1. Idun MCP server (stdlib-only, local)
+
+`idun_mcp.py` is a zero-dependency stdio MCP server — no FastMCP / httpx
+needed (runs on bare Python, ideal for Termux/Android).
+
+```bash
+python3 idun_mcp.py        # stdio MCP server
+```
+
+Tools exposed:
+- `idun_chat(prompt)` — final answer text
+- `idun_trace(prompt)` — full agent trajectory (steps + text)
+
+Add to any MCP client (e.g. Cursor `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "idun": { "command": "python3", "args": ["/abs/path/idun-sdk/idun_mcp.py"] }
+  }
+}
+```
+
+### 2. GitMCP docs mirror (remote, zero-setup)
+
+Point an MCP client at the GitMCP URL to give it live access to this repo's
+docs + code (prefers `llms.txt`):
+
+```
+https://gitmcp.io/qapdex-maker/idun-sdk
+```
+
+For stdio-only clients (Claude Desktop, Cline, Msty):
+
+```json
+{ "mcpServers": { "idun-docs": { "command": "npx", "args": ["mcp-remote", "https://gitmcp.io/qapdex-maker/idun-sdk"] } } }
+```
+
+**Recommended combo for a foreign agent:** both `idun` (calls the agent) and
+`idun-docs` (reads the SDK docs) — it can invoke Idun *and* look up the exact
+`IdunClient` signature on its own.
+
+[![GitMCP](https://img.shields.io/endpoint?url=https://gitmcp.io/badge/qapdex-maker/idun-sdk)](https://gitmcp.io/qapdex-maker/idun-sdk)
+
