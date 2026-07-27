@@ -90,6 +90,18 @@ def cmd_token(args):
             print("refresh returned no token")
 
 
+def cmd_export(args):
+    c = _client()
+    res = c.complete(args.prompt, max_output_tokens=args.max_tokens)
+    payload = res.to_json() if args.fmt == "json" else res.to_markdown()
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(payload)
+        print(f"wrote {args.fmt} trace -> {args.output} ({len(res.steps)} steps)")
+    else:
+        print(payload)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI")
     sub = p.add_subparsers(dest="command", required=True)
@@ -113,6 +125,14 @@ def build_parser() -> argparse.ArgumentParser:
     ptok.add_argument("--refresh", action="store_true", help="force a token rotation now")
     ptok.add_argument("-f", "--force", action="store_true", dest="force", help="alias for --refresh")
     ptok.set_defaults(func=cmd_token)
+
+    pe = sub.add_parser("export", help="run prompt and save agent trajectory")
+    pe.add_argument("prompt")
+    pe.add_argument("--format", choices=["json", "md"], default="json", dest="fmt",
+                    help="json (full trajectory) or md (human-readable trace doc)")
+    pe.add_argument("--output", "-o", help="write to file instead of stdout")
+    pe.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
+    pe.set_defaults(func=cmd_export)
     return p
 
 

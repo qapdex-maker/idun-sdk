@@ -48,6 +48,42 @@ class IdunResult:
     model: str = ""
     raw: dict = field(default_factory=dict)
 
+    def to_dict(self) -> dict:
+        """Machine-readable snapshot of the whole result (for re-ingest/CI)."""
+        return {
+            "model": self.model,
+            "text": self.text,
+            "steps": [s.__dict__ for s in self.steps],
+            "raw": self.raw,
+        }
+
+    def to_json(self, indent: int = 2) -> str:
+        """Compact JSON of the full trajectory (steps + final answer + raw)."""
+        return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
+
+    def to_markdown(self) -> str:
+        """Human-readable trace doc: header, step list, final answer."""
+        lines = [f"# Idun Trace — {self.model or 'unknown model'}", ""]
+        lines.append(f"**Steps:** {len(self.steps)}")
+        lines.append("")
+        lines.append("---")
+        for i, s in enumerate(self.steps, 1):
+            if s.kind == "tool":
+                lines.append(f"{i}. **TOOL** `{s.tool}` — {s.status}")
+                if s.query:
+                    lines.append(f"   - query: `{s.query}`")
+            else:
+                label = "REASON" if s.kind == "reasoning" else "MSG"
+                body = s.text.strip().replace("\n", " ")
+                lines.append(f"{i}. **{label}** {body[:280]}")
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+        lines.append("## Final Answer")
+        lines.append("")
+        lines.append(self.text.strip())
+        return "\n".join(lines)
+
 
 def _normalize_output(data: dict) -> IdunResult:
     """Convert Foundry Responses output[] into (final_text, steps[])."""

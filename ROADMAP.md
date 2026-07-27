@@ -35,7 +35,8 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 2. **365-Kalendereintrag** — sobald die Exchange-Lizenz nachgerüstet ist
    (Graph Device-Code liegt bereit; 401 = keine Mailbox).
 3. **Trace-Export** — Agent-Trajectory als JSON/Markdown speicherbar
-   (für Docs/PR-Anhänge).
+   (`idun export --format json|md -o file`, bzw. `IdunResult.to_json()/
+   to_markdown()`). Für Docs/PR-Anhänge. Offline getestet.
 4. **Side-by-Side-Trace** — zwei Prompt-Läufe nebeneinander vergleichen
    (Tool-Timeline-Diff).
 
