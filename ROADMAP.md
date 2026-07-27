@@ -20,8 +20,9 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 2. **Async finalisieren** — echte `asyncio`-Variante + CLI-Flag `--async`.
 3. **Test-Suite** — `pytest` statt nur `test.sh`; GitHub Actions CI läuft
    `test.sh` bei jedem Push (offline).
-4. **PyPI-Publish** — `pip install idun-sdk` (`setup.py` liegt, braucht
-   `python -m build` + `twine`).
+4. **PyPI-Publish** — `pip install idun-sdk` (**live auf PyPI**:
+   https://pypi.org/project/idun-sdk/ `v0.1.0`, stdlib-only, `install_requires=[]`).
+   Wheel + sdist via `python -m build`, Upload via `twine upload`.
 5. **Token-Auto-Rotation im CLI** — `idun login` speichert Refresh-Context,
    CLI erneuert `FOUNDRY_TOKEN` vor Ablauf (vorhandenes
    `rotate_foundry_token.sh` einbinden).

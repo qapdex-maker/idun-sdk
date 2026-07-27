@@ -10,9 +10,13 @@ see every reasoning step and tool call instead of a black-box chatbot wheel.
 ## Install
 
 ```bash
-cd idun_sdk
-pip install -e .        # provides the `idun` command
+pip install idun-sdk        # PyPI: https://pypi.org/project/idun-sdk/
+# or, from source:
+cd idun-sdk && pip install -e .
 ```
+
+The `idun` CLI and the `idun` Python package (plus the stdlib MCP server
+`idun_mcp.py`) are installed.
 
 ## Authenticate (device-code, Entra)
 
