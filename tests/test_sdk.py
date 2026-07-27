@@ -63,3 +63,71 @@ def test_cli_entrypoint():
 def test_package_importable():
     import idun
     assert hasattr(idun, "__version__")
+
+
+def test_trace_export_json():
+    from idun import IdunResult, Step
+    res = IdunResult(
+        text="Final answer.",
+        model="gpt-5.4-2026-03-05",
+        steps=[
+            Step(kind="reasoning", text="Plan: search."),
+            Step(kind="tool", tool="web_search", query="Contoso CEO",
+                  status="completed", id="s1"),
+        ],
+    )
+    import json
+    data = json.loads(res.to_json())
+    assert data["text"] == "Final answer."
+    assert data["model"] == "gpt-5.4-2026-03-05"
+    assert len(data["steps"]) == 2
+    assert data["steps"][1]["tool"] == "web_search"
+    assert data["steps"][1]["query"] == "Contoso CEO"
+
+
+def test_trace_export_markdown():
+    from idun import IdunResult, Step
+    res = IdunResult(
+        text="Final answer.",
+        model="gpt-5.4-2026-03-05",
+        steps=[Step(kind="tool", tool="web_search", query="q", status="done")],
+    )
+    md = res.to_markdown()
+    assert md.startswith("# Idun Trace")
+    assert "**TOOL**" in md
+    assert "## Final Answer" in md
+    assert "Final answer." in md
+
+
+def test_cli_export_subcommand():
+    from idun_cli import build_parser
+    args = build_parser().parse_args(
+        ["export", "Was macht Contoso?", "--format", "md", "-o", "trace.md"])
+    assert args.command == "export"
+    assert args.fmt == "md"
+    assert args.output == "trace.md"
+
+
+def test_logo_path_resolves_bundled_svg():
+    from idun import logo_path
+    import os
+    p = logo_path("white")
+    assert p.endswith(".svg")
+    assert os.path.exists(p), f"bundled logo missing: {p}"
+
+
+def test_maybe_refresh_noop_without_token():
+    from idun.auth import maybe_refresh
+    # no token file -> returns None, no crash
+    import os
+    # ensure no leftover token file in HOME for this check
+    bak = None
+    tf = os.path.join(os.path.expanduser("~"), "foundry_token.txt")
+    if os.path.exists(tf):
+        bak = tf + ".bak"
+        os.rename(tf, bak)
+    try:
+        assert maybe_refresh() is None
+    finally:
+        if bak and os.path.exists(bak):
+            os.rename(bak, tf)

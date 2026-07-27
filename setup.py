@@ -143,7 +143,7 @@ works everywhere Python 3.8+ runs.
 
 setup(
     name="idun-sdk",
-    version="0.1.4",
+    version="0.1.5",
     description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
