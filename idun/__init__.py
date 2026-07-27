@@ -3,9 +3,11 @@ import os
 
 from .client import IdunClient, IdunResult, Step, _normalize_output
 from .auth import login, load_token, maybe_refresh
+from .prompts import list_packs, load_pack, get_prompt
 
-__all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_refresh", "_normalize_output", "logo_path"]
-__version__ = "0.1.6"
+__all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_refresh",
+           "_normalize_output", "logo_path", "list_packs", "load_pack", "get_prompt"]
+__version__ = "0.1.7"
 
 
 def logo_path(variant: str = "white") -> str:

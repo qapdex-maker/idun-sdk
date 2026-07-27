@@ -26,7 +26,10 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 5. **Token-Auto-Rotation im CLI** — `idun login` speichert Refresh-Context,
    CLI erneuert `FOUNDRY_TOKEN` vor Ablauf (vorhandenes
    `rotate_foundry_token.sh` einbinden).
-6. **Contoso-Prompt-Packs** — kuratierte Demo-Prompts als JSON ladbar.
+6. **Contoso-Prompt-Packs** — kuratierte Demo-Prompts als JSON ladbar
+   (`idun data/prompt_packs/contoso_pack.json`, CLI `idun packs` /
+   `idun run contoso <key>`). 4 Prompts (Nachhaltigkeit, ESG, Web-Research,
+   Wettbewerb). Offline getestet.
 
 ## Phase 3 — Mittelfristig
 

@@ -155,3 +155,35 @@ def test_cli_async_flag_parses():
     finally:
         if bak and os.path.exists(bak):
             os.rename(bak, tf)
+
+
+def test_contoso_pack_loading():
+    from idun import list_packs, load_pack, get_prompt
+    packs = list_packs()
+    names = [p["name"] for p in packs]
+    assert "contoso" in names
+    contoso = next(p for p in packs if p["name"] == "contoso")
+    assert contoso["count"] == 4
+    data = load_pack("contoso")
+    assert len(data["prompts"]) == 4
+    text = get_prompt("contoso", "sustainability_summary")
+    assert "Kreislauf" in text
+    # error path
+    try:
+        get_prompt("contoso", "does_not_exist")
+        assert False, "expected KeyError"
+    except KeyError:
+        pass
+
+
+def test_cli_packs_and_run_subcommands():
+    from idun_cli import build_parser
+    # packs
+    a1 = build_parser().parse_args(["packs"])
+    assert a1.command == "packs"
+    # run
+    a2 = build_parser().parse_args(["run", "contoso", "esg_check", "--async"])
+    assert a2.command == "run"
+    assert a2.pack == "contoso"
+    assert a2.key == "esg_check"
+    assert a2.async_ is True

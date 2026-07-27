@@ -143,7 +143,7 @@ works everywhere Python 3.8+ runs.
 
 setup(
     name="idun-sdk",
-    version="0.1.6",
+    version="0.1.7",
     description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
@@ -158,7 +158,7 @@ setup(
     },
     packages=find_packages(),
     py_modules=["idun_cli", "idun_mcp"],
-    package_data={"idun": ["data/*.svg"]},
+    package_data={"idun": ["data/*.svg", "data/prompt_packs/*.json"]},
     python_requires=">=3.8",
     # stdlib-only: no runtime dependencies. Works headless on Termux.
     install_requires=[],

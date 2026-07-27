@@ -109,6 +109,29 @@ def cmd_export(args):
         print(payload)
 
 
+def cmd_packs(_args):
+    from idun import list_packs
+    packs = list_packs()
+    if not packs:
+        print("No prompt packs installed.")
+        return
+    print("Available prompt packs:\n")
+    for pk in packs:
+        print(f"  {pk['name']}  ({pk['count']} prompts) — {pk['title']}")
+        if pk["description"]:
+            print(f"    {pk['description']}")
+
+
+def cmd_run(args):
+    from idun import get_prompt
+    try:
+        prompt = get_prompt(args.pack, args.key)
+    except (FileNotFoundError, KeyError) as e:
+        sys.exit(str(e))
+    res = _run(args, prompt)
+    print(res.text)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI")
     sub = p.add_subparsers(dest="command", required=True)
@@ -146,6 +169,17 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--async", action="store_true", dest="async_",
                     help="use the asyncio variant (run_in_executor, no extra deps)")
     pe.set_defaults(func=cmd_export)
+
+    pk = sub.add_parser("packs", help="list available prompt packs")
+    pk.set_defaults(func=cmd_packs)
+
+    pr = sub.add_parser("run", help="run a prompt from a pack")
+    pr.add_argument("pack", help="pack name (e.g. contoso)")
+    pr.add_argument("key", help="prompt key inside the pack")
+    pr.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
+    pr.add_argument("--async", action="store_true", dest="async_",
+                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    pr.set_defaults(func=cmd_run)
     return p
 
 

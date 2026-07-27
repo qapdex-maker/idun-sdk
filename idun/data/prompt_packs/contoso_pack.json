@@ -1,0 +1,27 @@
+{
+  "name": "contoso",
+  "title": "Contoso Prompt Pack",
+  "description": "Kuratierte Demo-Prompts für die fiktive Marke Contoso (Nachhaltigkeit, Kreislauf, ESG).",
+  "prompts": [
+    {
+      "key": "sustainability_summary",
+      "title": "Nachhaltigkeits-Kurzfassung",
+      "prompt": "Fasse zusammen, wie Contoso Kreislaufwirtschaft und Nachhaltigkeit in seinem Geschäftsmodell verankert. Nenne drei konkrete Beispiele."
+    },
+    {
+      "key": "esg_check",
+      "title": "ESG-Prüfung",
+      "prompt": "Prüfe die öffentlichen ESG-Angaben von Contoso gegen die Kriterien: Emissionen, Lieferkette, Governance. Wo gibt es Lücken?"
+    },
+    {
+      "key": "web_research",
+      "title": "Web-Recherche Contoso",
+      "prompt": "Recherchiere aktuelle Nachrichten zu Contoso und Nachhaltigkeit. Welche Quellen berichten positiv, welche kritisch?"
+    },
+    {
+      "key": "competitor_compare",
+      "title": "Wettbewerbsvergleich",
+      "prompt": "Vergleiche Contoso mit einem realen Wettbewerber in der Kreislaufwirtschaft. Wo ist Contoso führend, wo hinten?"
+    }
+  ]
+}
