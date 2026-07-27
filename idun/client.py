@@ -114,17 +114,44 @@ class IdunClient:
             "max_output_tokens": max_output_tokens,
         }
 
-    def complete(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
-        """Synchronous completion. Returns final text + agent trajectory."""
+    def _post_once(self, prompt: str, max_output_tokens: int) -> dict:
         payload = self._build_payload(prompt, max_output_tokens)
         req = urllib.request.Request(
             self._url(), data=json.dumps(payload).encode("utf-8"),
             headers=self._headers(), method="POST",
         )
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return json.loads(resp.read())
+
+    def complete(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
+        """Synchronous completion. Returns final text + agent trajectory.
+
+        Phase 2.5: rotates the Entra token before the call (silent refresh when
+        a refresh_token is stored) and retries once on HTTP 401 (expired token).
+        """
+        from .auth import maybe_refresh  # lazy import keeps install_requires=[]
+
+        # ensure a fresh token before the request
+        refreshed = maybe_refresh()
+        if refreshed:
+            self.token = refreshed
+
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                data = json.loads(resp.read())
+            data = self._post_once(prompt, max_output_tokens)
         except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8", "replace")[:400]
-            raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
+            if e.code == 401:
+                # token may have just expired -> one forced rotation + retry
+                rotated = maybe_refresh(force=True)
+                if rotated:
+                    self.token = rotated
+                    try:
+                        data = self._post_once(prompt, max_output_tokens)
+                    except urllib.error.HTTPError as e2:
+                        body = e2.read().decode("utf-8", "replace")[:400]
+                        raise RuntimeError(f"Foundry HTTP {e2.code} after token refresh: {body}") from e2
+                else:
+                    raise
+            else:
+                body = e.read().decode("utf-8", "replace")[:400]
+                raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
         return _normalize_output(data)
