@@ -1,6 +1,6 @@
 # Idun SDK
 
-[![Azure AI Foundry](https://img.shields.io/badge/Azure%20AI%20Foundry-NatureLM--Idun--5--MoE-8b5cf6)](https://ai.azure.com)
+[![Azure AI Foundry](https://img.shields.io/badge/Azure%20AI%20Foundry-NatureLM--Idun--5--MoE-8b5cf6)](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11)
 [![PyPI version](https://img.shields.io/pypi/v/idun-sdk.svg)](https://pypi.org/project/idun-sdk/)
 [![Python](https://img.shields.io/pypi/pyversions/idun-sdk.svg)](https://pypi.org/project/idun-sdk/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://pypi.org/project/idun-sdk/)
@@ -10,7 +10,7 @@
   <img src="https://raw.githubusercontent.com/qapdex-maker/idun-sdk/main/idun/data/foundry_logo_color.svg" width="104" height="110" alt="Azure AI Foundry logo"/>
 </p>
 
-**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com) agent on Azure AI Foundry.**
+**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry.**
 
 No `httpx`, no `azure-identity`, no Flask — it runs headless on Termux/Android with
 nothing but the Python standard library. Idun is a **tool agent** (it reasons and
@@ -101,4 +101,4 @@ Authorization: Bearer ***
 
 - PyPI: https://pypi.org/project/idun-sdk/
 - Repo: https://github.com/qapdex-maker/idun-sdk
-- Foundry: https://ai.azure.com
+- Foundry: https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11
