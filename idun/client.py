@@ -86,6 +86,54 @@ class IdunResult:
         return "\n".join(lines)
 
 
+def diff_traces(a: IdunResult, b: IdunResult) -> dict:
+    """Compare two agent trajectories (side-by-side tool-timeline diff).
+
+    Returns a structured dict:
+      - n_steps_a / n_steps_b
+      - only_a / only_b: tool queries unique to each run
+      - shared_queries: tool queries present in both runs
+      - text_a_len / text_b_len
+      - same_answer: exact final-text match
+    Offline, no network.
+    """
+    qa = {s.query for s in a.steps if s.kind == "tool" and s.query}
+    qb = {s.query for s in b.steps if s.kind == "tool" and s.query}
+    return {
+        "n_steps_a": len(a.steps),
+        "n_steps_b": len(b.steps),
+        "shared_queries": sorted(qa & qb),
+        "only_a": sorted(qa - qb),
+        "only_b": sorted(qb - qa),
+        "text_a_len": len(a.text),
+        "text_b_len": len(b.text),
+        "same_answer": a.text.strip() == b.text.strip(),
+    }
+
+
+def format_diff(d: dict, fmt: str = "md") -> str:
+    """Render a diff_traces() result as markdown or json."""
+    if fmt == "json":
+        return json.dumps(d, indent=2, ensure_ascii=False)
+    lines = ["# Idun Trace Diff", ""]
+    lines.append(f"- Steps A: **{d['n_steps_a']}**  |  Steps B: **{d['n_steps_b']}**")
+    lines.append(f"- Final answer identical: **{d['same_answer']}** "
+                 f"(len A={d['text_a_len']}, B={d['text_b_len']})")
+    lines.append("")
+    lines.append(f"## Shared tool queries ({len(d['shared_queries'])})")
+    for q in d["shared_queries"]:
+        lines.append(f"  - `{q}`")
+    lines.append("")
+    lines.append(f"## Unique to A ({len(d['only_a'])})")
+    for q in d["only_a"]:
+        lines.append(f"  - `{q}`")
+    lines.append("")
+    lines.append(f"## Unique to B ({len(d['only_b'])})")
+    for q in d["only_b"]:
+        lines.append(f"  - `{q}`")
+    return "\n".join(lines)
+
+
 def _normalize_output(data: dict) -> IdunResult:
     """Convert Foundry Responses output[] into (final_text, steps[])."""
     text = ""

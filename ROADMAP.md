@@ -41,7 +41,8 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
    (`idun export --format json|md -o file`, bzw. `IdunResult.to_json()/
    to_markdown()`). Für Docs/PR-Anhänge. Offline getestet.
 4. **Side-by-Side-Trace** — zwei Prompt-Läufe nebeneinander vergleichen
-   (Tool-Timeline-Diff).
+   (Tool-Timeline-Diff). `idun diff PROMPT_A PROMPT_B [--format json|md]`,
+   bzw. `diff_traces(a,b)` / `format_diff(d,fmt)` im SDK. Offline getestet.
 
 ## Phase 4 — Vision
 

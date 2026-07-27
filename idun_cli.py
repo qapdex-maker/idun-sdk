@@ -132,6 +132,14 @@ def cmd_run(args):
     print(res.text)
 
 
+def cmd_diff(args):
+    ra = _run(args, args.prompt_a)
+    rb = _run(args, args.prompt_b)
+    from idun import diff_traces, format_diff
+    d = diff_traces(ra, rb)
+    print(format_diff(d, args.fmt))
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI")
     sub = p.add_subparsers(dest="command", required=True)
@@ -180,6 +188,16 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--async", action="store_true", dest="async_",
                     help="use the asyncio variant (run_in_executor, no extra deps)")
     pr.set_defaults(func=cmd_run)
+
+    pd = sub.add_parser("diff", help="compare two prompt trajectories (side-by-side)")
+    pd.add_argument("prompt_a", metavar="PROMPT_A")
+    pd.add_argument("prompt_b", metavar="PROMPT_B")
+    pd.add_argument("--format", choices=["json", "md"], default="md", dest="fmt",
+                    help="diff output format (json or human-readable md)")
+    pd.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
+    pd.add_argument("--async", action="store_true", dest="async_",
+                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    pd.set_defaults(func=cmd_diff)
     return p
 
 

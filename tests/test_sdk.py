@@ -187,3 +187,32 @@ def test_cli_packs_and_run_subcommands():
     assert a2.pack == "contoso"
     assert a2.key == "esg_check"
     assert a2.async_ is True
+
+
+def test_trace_diff_offline():
+    from idun import IdunResult, Step, diff_traces, format_diff
+    a = IdunResult(text="Answer A", model="m", steps=[
+        Step(kind="tool", tool="web_search", query="Contoso ESG", status="done"),
+        Step(kind="tool", tool="web_search", query="Contoso News", status="done")])
+    b = IdunResult(text="Answer B", model="m", steps=[
+        Step(kind="tool", tool="web_search", query="Contoso ESG", status="done"),
+        Step(kind="tool", tool="web_search", query="Contoso Finance", status="done")])
+    d = diff_traces(a, b)
+    assert d["shared_queries"] == ["Contoso ESG"]
+    assert d["only_a"] == ["Contoso News"]
+    assert d["only_b"] == ["Contoso Finance"]
+    assert d["same_answer"] is False
+    md = format_diff(d, "md")
+    assert "# Idun Trace Diff" in md and "Shared tool queries" in md
+    js = format_diff(d, "json")
+    import json
+    assert json.loads(js)["n_steps_a"] == 2
+
+
+def test_cli_diff_subcommand():
+    from idun_cli import build_parser
+    a = build_parser().parse_args(["diff", "Prompt A", "Prompt B", "--format", "json"])
+    assert a.command == "diff"
+    assert a.prompt_a == "Prompt A"
+    assert a.prompt_b == "Prompt B"
+    assert a.fmt == "json"
