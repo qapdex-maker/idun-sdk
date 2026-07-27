@@ -26,7 +26,7 @@ The `idun` CLI and the `idun` Python package (plus the stdlib MCP server
 ```bash
 idun login
 # opens https://microsoft.com/devicelogin — enter the printed code,
-# sign in with any QMFI-Research tenant account (no admin role required).
+# sign in with your tenant account (no admin role required).
 # Token is saved to ~/foundry_token.txt (FOUNDRY_TOKEN).
 ```
 
@@ -151,11 +151,11 @@ works everywhere Python 3.8+ runs.
 
 setup(
     name="idun-sdk",
-    version="0.1.10",
+    version="0.1.11",
     description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
-    author="QMFI-Research",
+    author="Idun",
     author_email="alexanderkleine@qmfiresearch.onmicrosoft.com",
     url="https://github.com/qapdex-maker/idun-sdk",
     project_urls={
