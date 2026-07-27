@@ -13,6 +13,7 @@ This is what makes Idun a visible tool-agent, not a chatbot wheel.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -182,6 +183,39 @@ class IdunClient:
                     self.token = rotated
                     try:
                         data = self._post_once(prompt, max_output_tokens)
+                    except urllib.error.HTTPError as e2:
+                        body = e2.read().decode("utf-8", "replace")[:400]
+                        raise RuntimeError(f"Foundry HTTP {e2.code} after token refresh: {body}") from e2
+                else:
+                    raise
+            else:
+                body = e.read().decode("utf-8", "replace")[:400]
+                raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
+        return _normalize_output(data)
+
+    async def complete_async(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
+        """Async variant of complete().
+
+        Stdlib-only: the blocking urllib call runs in the default executor so
+        the surrounding asyncio loop stays responsive (no httpx/aiohttp dep).
+        Rotates the token (sync, fast) before the call; on 401 it retries once.
+        """
+        from .auth import maybe_refresh  # lazy import keeps install_requires=[]
+
+        refreshed = maybe_refresh()
+        if refreshed:
+            self.token = refreshed
+
+        loop = asyncio.get_event_loop()
+        try:
+            data = await loop.run_in_executor(None, self._post_once, prompt, max_output_tokens)
+        except urllib.error.HTTPError as e:
+            if e.code == 401:
+                rotated = maybe_refresh(force=True)
+                if rotated:
+                    self.token = rotated
+                    try:
+                        data = await loop.run_in_executor(None, self._post_once, prompt, max_output_tokens)
                     except urllib.error.HTTPError as e2:
                         body = e2.read().decode("utf-8", "replace")[:400]
                         raise RuntimeError(f"Foundry HTTP {e2.code} after token refresh: {body}") from e2

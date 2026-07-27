@@ -17,6 +17,7 @@ import sys
 import time
 
 from idun import IdunClient, login as do_login, load_token, logo_path
+from idun.client import IdunResult
 from idun.auth import maybe_refresh, _load_meta, REFRESH_SLACK
 
 BANNER = r"""
@@ -35,20 +36,27 @@ def _client() -> IdunClient:
     return IdunClient(token=tok)
 
 
+def _run(args, prompt) -> IdunResult:
+    """Sync or async completion based on args.async flag (default sync)."""
+    c = _client()
+    if getattr(args, "async_", False):
+        import asyncio
+        return asyncio.run(c.complete_async(prompt, max_output_tokens=args.max_tokens))
+    return c.complete(prompt, max_output_tokens=args.max_tokens)
+
+
 def cmd_login(_args):
     print(BANNER)
     do_login()
 
 
 def cmd_chat(args):
-    c = _client()
-    res = c.complete(args.prompt, max_output_tokens=args.max_tokens)
+    res = _run(args, args.prompt)
     print(res.text)
 
 
 def cmd_trace(args):
-    c = _client()
-    res = c.complete(args.prompt, max_output_tokens=args.max_tokens)
+    res = _run(args, args.prompt)
     print(f"Model: {res.model}\n")
     print("AGENT TRACE ({})".format(len(res.steps)))
     print("=" * 60)
@@ -91,8 +99,7 @@ def cmd_token(args):
 
 
 def cmd_export(args):
-    c = _client()
-    res = c.complete(args.prompt, max_output_tokens=args.max_tokens)
+    res = _run(args, args.prompt)
     payload = res.to_json() if args.fmt == "json" else res.to_markdown()
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
@@ -113,11 +120,15 @@ def build_parser() -> argparse.ArgumentParser:
     pc = sub.add_parser("chat", help="print final answer")
     pc.add_argument("prompt")
     pc.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
+    pc.add_argument("--async", action="store_true", dest="async_",
+                    help="use the asyncio variant (run_in_executor, no extra deps)")
     pc.set_defaults(func=cmd_chat)
 
     pt = sub.add_parser("trace", help="print agent trajectory (steps)")
     pt.add_argument("prompt")
     pt.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
+    pt.add_argument("--async", action="store_true", dest="async_",
+                    help="use the asyncio variant (run_in_executor, no extra deps)")
     pt.set_defaults(func=cmd_trace)
 
     ptok = sub.add_parser("token", help="inspect / rotate stored token")
@@ -132,6 +143,8 @@ def build_parser() -> argparse.ArgumentParser:
                     help="json (full trajectory) or md (human-readable trace doc)")
     pe.add_argument("--output", "-o", help="write to file instead of stdout")
     pe.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
+    pe.add_argument("--async", action="store_true", dest="async_",
+                    help="use the asyncio variant (run_in_executor, no extra deps)")
     pe.set_defaults(func=cmd_export)
     return p
 

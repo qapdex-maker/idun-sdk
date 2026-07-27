@@ -5,7 +5,7 @@ from .client import IdunClient, IdunResult, Step, _normalize_output
 from .auth import login, load_token, maybe_refresh
 
 __all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_refresh", "_normalize_output", "logo_path"]
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 
 def logo_path(variant: str = "white") -> str:

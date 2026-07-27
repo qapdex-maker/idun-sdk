@@ -116,7 +116,31 @@ def test_logo_path_resolves_bundled_svg():
     assert os.path.exists(p), f"bundled logo missing: {p}"
 
 
-def test_maybe_refresh_noop_without_token():
+def test_async_complete_offline(monkeypatch):
+    import asyncio
+    from idun import IdunClient, IdunResult
+    c = IdunClient(token="fake")
+    def fake_post(self, prompt, max_tokens):
+        return {"model": "gpt-x", "output": [
+            {"type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "Hi"}]},
+            {"type": "web_search_call", "action": {"query": "q"},
+             "status": "completed", "id": "s1"}]}
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    res = asyncio.run(c.complete_async("test", 4096))
+    assert res.text == "Hi"
+    assert len(res.steps) == 2
+    assert res.steps[1].tool == "web_search"
+
+
+def test_cli_async_flag_parses():
+    from idun_cli import build_parser
+    args = build_parser().parse_args(["chat", "Hi", "--async"])
+    assert args.async_ is True
+    args2 = build_parser().parse_args(["trace", "Hi", "--async"])
+    assert args2.async_ is True
+    args3 = build_parser().parse_args(["export", "Hi", "--async", "--format", "md"])
+    assert args3.async_ is True
     from idun.auth import maybe_refresh
     # no token file -> returns None, no crash
     import os
