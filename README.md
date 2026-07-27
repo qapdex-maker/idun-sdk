@@ -101,4 +101,4 @@ Authorization: Bearer ***
 
 - PyPI: https://pypi.org/project/idun-sdk/
 - Repo: https://github.com/qapdex-maker/idun-sdk
-- Foundry: https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11
+- Foundry: https://ai.azure.com
