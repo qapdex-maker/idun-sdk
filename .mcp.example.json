@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "idun": {
+      "command": "python3",
+      "args": ["idun_mcp.py"]
+    },
+    "idun-docs": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://gitmcp.io/qapdex-maker/idun-sdk/sse"]
+    },
+    "sentry": {
+      "url": "https://mcp.sentry.dev"
+    }
+  }
+}

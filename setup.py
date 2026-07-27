@@ -8,7 +8,7 @@ with open(readme_path, encoding="utf-8") as f:
 
 setup(
     name="idun-sdk",
-    version="0.1.15",
+    version="0.1.16",
     description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",

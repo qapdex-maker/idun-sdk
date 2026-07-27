@@ -86,6 +86,28 @@ Exposes `idun_chat(prompt)` and `idun_trace(prompt)`. Add to any MCP client:
 
 Docs mirror (GitMCP): `https://gitmcp.io/qapdex-maker/idun-sdk/sse`
 
+## Combine with Sentry (MCP)
+
+Idun pairs well with [Sentry's MCP server](https://github.com/getsentry/sentry-mcp)
+so an agent can both *call* Idun and *inspect* Sentry errors/traces. Sentry
+MCP is a separate, optional provider — the Idun SDK stays stdlib-only.
+
+Remote (zero-setup):
+
+```json
+{ "mcpServers": { "sentry": { "url": "https://mcp.sentry.dev" } } }
+```
+
+Stdio (self-hosted / pinned):
+
+```json
+{ "mcpServers": { "sentry": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] } } }
+```
+
+Recommended combo for a foreign agent: `idun` (calls the agent) + `idun-docs`
+(reads the SDK docs) + `sentry` (queries error tracking). The agent can invoke
+Idun and, when a call fails, pull the correlated Sentry issue on its own.
+
 ## Request shape (verified)
 
 ```
