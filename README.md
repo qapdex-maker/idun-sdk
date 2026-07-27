@@ -23,9 +23,20 @@ The `idun` CLI and the `idun` Python package (plus the stdlib MCP server
 ```bash
 idun login
 # opens https://microsoft.com/devicelogin — enter the printed code,
-# sign in with your QMFI-Research admin account.
+# sign in with any QMFI-Research tenant account (no admin role required).
 # Token is saved to ~/foundry_token.txt (FOUNDRY_TOKEN).
 ```
+
+**No admin role needed.** `idun login` runs a standard Entra device-code
+flow and returns a plain bearer access token for the Foundry agent
+endpoint. You do **not** become a portal admin — you only get an API token
+that the SDK attaches to each request. Any tenant user who has been granted
+**access to the NatureLM-Idun-5-MoE agent** (RBAC on the Foundry resource)
+can run `idun login`. Admin rights are only needed to *configure or redeploy*
+the agent, not to *use* it.
+
+The token is a normal Entra `FOUNDRY_TOKEN` (scope `https://ai.azure.com/.default`);
+it auto-rotates before expiry (Phase 2.5).
 
 ## Use
 
