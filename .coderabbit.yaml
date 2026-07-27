@@ -1,0 +1,31 @@
+# CodeRabbit configuration — Idun SDK
+# Policy: zero-critical-before-merge (NVIDIA-aligned), diff-scoped reviews.
+reviews:
+  # Only review changed files in the PR (diff-scoped) — Flow 1.
+  diff_scope: true
+  # Fail/flag on criticals; do not auto-merge on critical findings.
+  severity_threshold: critical
+  # Auto-review on every PR + every push to an open PR.
+  auto_review:
+    enabled: true
+    drafts: true
+  # Path filters — keep SDK core in scope.
+  path_filters:
+    - "idun/*.py"
+    - "idun_cli.py"
+    - "idun_mcp.py"
+    - "tests/*.py"
+  # Reduce noise: ignore known stdlib-only false positives.
+  ignore:
+    # We deliberately avoid requests/httpx/azure-identity (Termux/Android headless).
+    - "Consider using 'requests' or 'httpx' instead of urllib"
+    - "Replace urllib with httpx"
+    - "Use azure-identity for authentication"
+    # JSON parsing is stdlib json.loads — not a security issue here.
+    - "Use a proper JSON parser"
+  # Learning: store accepted ignore decisions for future reviews.
+  learning:
+    enabled: true
+chat:
+  # Let CodeRabbit answer review questions in PR comments.
+  auto_reply: true
