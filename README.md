@@ -92,16 +92,22 @@ Idun pairs well with [Sentry's MCP server](https://github.com/getsentry/sentry-m
 so an agent can both *call* Idun and *inspect* Sentry errors/traces. Sentry
 MCP is a separate, optional provider — the Idun SDK stays stdlib-only.
 
-Remote (zero-setup):
+Remote (zero-setup, OAuth — **note the `/mcp` suffix**):
 
 ```json
-{ "mcpServers": { "sentry": { "url": "https://mcp.sentry.dev" } } }
+{ "mcpServers": { "sentry": { "url": "https://mcp.sentry.dev/mcp" } } }
 ```
 
-Stdio (self-hosted / pinned):
+Stdio (OAuth via `mcp-remote`, no static token needed):
 
 ```json
-{ "mcpServers": { "sentry": { "command": "npx", "args": ["-y", "@sentry/mcp-server"] } } }
+{ "mcpServers": { "sentry": { "command": "npx", "args": ["-y", "mcp-remote@latest", "https://mcp.sentry.dev/mcp"] } } }
+```
+
+Authenticate once (opens a browser for the OAuth flow):
+
+```
+/mcp auth sentry
 ```
 
 Recommended combo for a foreign agent: `idun` (calls the agent) + `idun-docs`

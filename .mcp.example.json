@@ -9,7 +9,7 @@
       "args": ["mcp-remote", "https://gitmcp.io/qapdex-maker/idun-sdk/sse"]
     },
     "sentry": {
-      "url": "https://mcp.sentry.dev"
+      "url": "https://mcp.sentry.dev/mcp"
     }
   }
 }
