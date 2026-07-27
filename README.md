@@ -23,7 +23,7 @@ The `idun` CLI and the `idun` Python package (plus the stdlib MCP server
 ```bash
 idun login
 # opens https://microsoft.com/devicelogin — enter the printed code,
-# sign in with any QMFI-Research tenant account (no admin role required).
+# sign in with your tenant account (no admin role required).
 # Token is saved to ~/foundry_token.txt (FOUNDRY_TOKEN).
 ```
 
