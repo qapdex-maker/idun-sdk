@@ -5,21 +5,28 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 
 ## Status quo (erledigt, live auf GitHub / PyPI)
 
-- **idun-sdk** `v0.1.17` auf PyPI: `pip install idun-sdk` (stdlib-only,
-  `install_requires=[]`). Client + CLI (`idun login|chat|trace|export|
-  packs|run|diff|token|logo`), Entra Device-Code-Auth, Token-Auto-Rotation,
-  Async (`--async`), Trace-Export, Contoso-Prompt-Packs, Side-by-Side-Diff.
+- **idun-sdk** `v0.1.18` (Code gemergt + Tag `v0.1.18` pushed; **PyPI-Upload
+  offen — kein TWINE_PASSWORD in Session**): `pip install idun-sdk`
+  (stdlib-only, `install_requires=[]`). Client + CLI (`idun
+  login|chat|trace|export|packs|run|diff|token|logo`), Entra Device-Code-Auth,
+  Token-Auto-Rotation, Async (`--async`, jetzt `get_running_loop()` statt
+  deprecated `get_event_loop()`), Trace-Export, Contoso-Prompt-Packs,
+  Side-by-Side-Diff.
 - **idun-playground**: Dark-Mode (ai.azure.com-Look), Agent-Trace-Panel,
   `diff.html` (Side-by-Side-Spalten), `router.py` (stdlib HTTP-Server mit
-  `/api/chat`, `/api/chat/stream` SSE, `/api/diff`). **Router E2E verifiziert**
-  (alle 3 Endpunkte 200 mit echtem FOUNDRY_TOKEN, live im Recording bestätigt).
-- **CodeRabbit PR #1** gemergt: `router.py` Security-Hardening
-  (Security-Header all-paths via `end_headers()` override, exakte Host-Check
-  + loopback-bind, BrokenPipe-Abwehr). Findings F1/F2 behoben + re-verifiziert.
+  `/api/chat`, `/api/chat/stream` SSE, `/api/diff`, **BrokenPipeError-guarded
+  SSE-Loop**). **Router E2E verifiziert** (alle 3 Endpunkte 200 mit echtem
+  FOUNDRY_TOKEN, live im Recording bestätigt).
+- **CodeRabbit**: PR #1 (idun-sdk, async-Fix) + PR #3 (playground, SSE-guard)
+  gemergt — beide 🎉 ohne actionable Findings reviewt. `.coderabbit.yaml`
+  path_filters-Bug behoben (alle diff-scoped Files werden jetzt erfasst).
 - **Docs**: README/long_description (QMFI entfernt, "no admin needed"),
   Sentry-MCP-Sektion (remote `https://mcp.sentry.dev/mcp` + `mcp-remote`
   OAuth-Flow), `.mcp.example.json` (idun + idun-docs + sentry Combo).
-- **CI**: `pytest`-Suite (14 passed) + GitHub Actions, offline.
+- **CI**: `pytest`-Suite (wird über `run_tests.sh` ausgeführt, cwd-gepinnt +
+  Fremd-Trees via `norecursedirs`/`--ignore` ausgeschlossen — verhindert den
+  vorigen 10-Min-Crash durch Chromium/Qt-Tests unter `~/storage`). 8 Tests
+  grün.
 - **CodeRabbit-Key verifiziert**: `cr-ce37...` ist gültig (Server akzeptiert
   ihn, `403` statt `401` am Enterprise-only Metrics-Endpoint). Pro+-Plan →
   GitHub-App PR-Review-Flow nutzbar; REST-API sonst Enterprise-gated.
