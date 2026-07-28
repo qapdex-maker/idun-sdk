@@ -63,8 +63,15 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
    kein Commit auf Upstream ohne Review). PoC reicht als Machbarkeitsnachweis.
    **Offen (nur falls später wieder aufgenommen):** Diff-Endpoint langsam unter
    Foundry-Latenz (2× seq. Calls), kein Upstream-PR, kein CI-Test im WebUI-Repo.
-2. **Wiederverwendbare Tool-Agent-Visualisierung (4.2)** — Komponente für
-   andere Foundry-Agents. (offen)
+2. **Wiederverwendbare Tool-Agent-Visualisierung (4.2)** — **ERLEDIGT:**
+   `trace-viz.js` + `trace-viz.css` (stdlib ES, keine Deps) rendern eine
+   Agent-Trajectory (reasoning + tool steps) in beliebige Container und nutzen
+   die CSS-Variablen der Host-Seite (Foundry dark/light). `TraceViz.render()`
+   (single trace) + `TraceViz.renderDiff()` (Side-by-Side mit Shared/Unique-
+   Markern). `playground.html` und `diff.html` nutzen jetzt BEIDE diese eine
+   Komponente (duplizierter Inline-Code entfernt). `trace-viz-demo.html`
+   zeigt die Einbindung für **andere Foundry-Agents**. Node-Syntax- + Logik-
+   Test grün. Committet (`74dadf6`, IN SYNC).
 3. **Streaming (SSE) (4.3)** — `router.py /api/chat/stream` (NDJSON) +
    `playground.html` `streamPrompt()`. ✓ (UI + Router gebaut; **Live-Test
    verifiziert**, Router E2E localhost 200).
@@ -90,7 +97,7 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
   zu große Baustelle (fremdes Repo, AGENTS.md-Constraints). Nur wieder
   aufnehmen, falls du die WebUI-Integration wirklich willst.
 - **B** — Phase 4.2: Tool-Agent-Visualisierung als wiederverwendbare
-  Komponente (im idun-playground, nicht WebUI).
+  Komponente (`trace-viz.js`/`.css`, in playground + diff genutzt). ✓ ERLEDIGT.
 - **C** — Extern: PR #4249 / 365-Kalender (blockiert, nur Nachfassen).
 - **D** — Optional: Diff-Endpoint Performance (parallel Calls / SSE-Streaming
   für Diff) wenn Foundry-Latenz ein Problem wird.
