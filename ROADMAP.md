@@ -51,16 +51,18 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 
 ## Phase 4 — Vision
 
-1. **Idun als Backend in Hermes WebUI (4.1)** — **ERLEDIGT:**
-   `api/idun.py` + Dispatch in `handle_post` (`/api/idun/chat`,
-   `/api/idun/diff`). Chat-Endpoint **live verifiziert** (200, echte
-   Foundry-Antwort). Zusätzlich **sichtbarer UI-Tab**: `static/idun.html`
-   (dark ai.azure.com-Look) + `GET /idun` Route (servt idun.html) +
-   JS → `POST /api/idun/chat`. Committet auf Branch `feat/idun-phase4-1`
-   in `~/repo/own/hermes-webui`.
-   **Offen:** FOUNDRY-Token expired → Chat hängt am device-code login
-   (Code OK, nur Auth-State). Diff-Endpoint funktional, aber langsam
-   unter hoher Foundry-Latenz (2× seq. Calls, Retry bei transientem 500).
+1. **Idun als Backend in Hermes WebUI (4.1)** — **BACK-BURNER (PoC verifiziert):**
+   Lokaler Fork `~/repo/own/hermes-webui` (Branch `feat/idun-phase4-1`)
+   hat den Proof-of-Concept: `api/idun.py` + Dispatch in `handle_post`
+   (`/api/idun/chat`, `/api/idun/diff`), **sichtbarer UI-Tab** `static/idun.html`
+   (dark ai.azure.com-Look) + `GET /idun` Route + JS → `POST /api/idun/chat`.
+   **Live verifiziert** (200, echte Foundry-Antwort, Token refreshed via
+   device-code). Nous-Provider in den Setup-Wizard eingehängt.
+   **Warum zurückgestellt:** Volle WebUI-Integration ist eine zu große Baustelle
+   (fremdes Repo, AGENTS.md-Constraints: eine Änderung/PR, `./scripts/test.sh`,
+   kein Commit auf Upstream ohne Review). PoC reicht als Machbarkeitsnachweis.
+   **Offen (nur falls später wieder aufgenommen):** Diff-Endpoint langsam unter
+   Foundry-Latenz (2× seq. Calls), kein Upstream-PR, kein CI-Test im WebUI-Repo.
 2. **Wiederverwendbare Tool-Agent-Visualisierung (4.2)** — Komponente für
    andere Foundry-Agents. (offen)
 3. **Streaming (SSE) (4.3)** — `router.py /api/chat/stream` (NDJSON) +
@@ -83,11 +85,12 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 
 ## Nächste unblockierte Schritte (Priorität)
 
-- **A** — Phase 4.1 UI: sichtbarer "Idun Agent"-Tab in Hermes WebUI
-  (`idun.html` + `GET /idun` Route + JS → `POST /api/idun/chat`). ✓ ERLEDIGT.
-- **A'** — FOUNDRY-Token refreshen (device-code login), dann Idun-Chat
-  im WebUI-Tab live mit echtem Token verifizieren.
-- **B** — Phase 4.2: Tool-Agent-Visualisierung als wiederverwendbare Komponente.
+- **A / A'** — Phase 4.1 WebUI: **BACK-BURNER.** PoC verifiziert
+  (`feat/idun-phase4-1`: Tab + Chat live). Keine weitere WebUI-Arbeit —
+  zu große Baustelle (fremdes Repo, AGENTS.md-Constraints). Nur wieder
+  aufnehmen, falls du die WebUI-Integration wirklich willst.
+- **B** — Phase 4.2: Tool-Agent-Visualisierung als wiederverwendbare
+  Komponente (im idun-playground, nicht WebUI).
 - **C** — Extern: PR #4249 / 365-Kalender (blockiert, nur Nachfassen).
 - **D** — Optional: Diff-Endpoint Performance (parallel Calls / SSE-Streaming
   für Diff) wenn Foundry-Latenz ein Problem wird.
