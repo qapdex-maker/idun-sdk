@@ -254,7 +254,11 @@ class IdunClient:
         if refreshed:
             self.token = refreshed
 
-        loop = asyncio.get_event_loop()
+        # get_running_loop() is the correct call inside a coroutine: it raises a
+        # clear RuntimeError if no loop is active instead of silently creating a
+        # new one (asyncio.get_event_loop() is deprecated and can return a wrong
+        # loop on 3.12+). The caller is responsible for providing the loop.
+        loop = asyncio.get_running_loop()
         try:
             data = await loop.run_in_executor(None, self._post_once, prompt, max_output_tokens)
         except urllib.error.HTTPError as e:
