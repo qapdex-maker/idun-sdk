@@ -51,18 +51,17 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 
 ## Phase 4 — Vision
 
-1. **Idun als Backend in Hermes WebUI (4.1)** — **BACK-BURNER (PoC verifiziert):**
-   Lokaler Fork `~/repo/own/hermes-webui` (Branch `feat/idun-phase4-1`)
-   hat den Proof-of-Concept: `api/idun.py` + Dispatch in `handle_post`
-   (`/api/idun/chat`, `/api/idun/diff`), **sichtbarer UI-Tab** `static/idun.html`
-   (dark ai.azure.com-Look) + `GET /idun` Route + JS → `POST /api/idun/chat`.
-   **Live verifiziert** (200, echte Foundry-Antwort, Token refreshed via
-   device-code). Nous-Provider in den Setup-Wizard eingehängt.
-   **Warum zurückgestellt:** Volle WebUI-Integration ist eine zu große Baustelle
-   (fremdes Repo, AGENTS.md-Constraints: eine Änderung/PR, `./scripts/test.sh`,
-   kein Commit auf Upstream ohne Review). PoC reicht als Machbarkeitsnachweis.
-   **Offen (nur falls später wieder aufgenommen):** Diff-Endpoint langsam unter
-   Foundry-Latenz (2× seq. Calls), kein Upstream-PR, kein CI-Test im WebUI-Repo.
+1. **Idun als Backend in Hermes WebUI (4.1)** — **NICHT GEPLANT (bewusst verzichtet):**
+   Entscheidung: Idun braucht keine WebUI-Integration. Die saubere, wartbare
+   Anbindung ist (1) Idun als **MCP-Server** (`idun` + `idun-docs`) → Hermes
+   core ruft es via Tool, und (2) der **eigenständige Playground**
+   (`idun-playground`, dark Foundry-Look, Chat/Diff/SSE). Ein zweiter UI-Ort
+   im fremden `hermes-webui`-Repo (AGENTS.md: 1 PR = 1 Änderung, eigene
+   `.venv`-Policy, Upstream-Review) wäre Doppelpflege + Merge-Risiko bei
+   Upstream-Updates, ohne echten Mehrwert.
+   **PoC (lokaler Fork `~/repo/own/hermes-webui`, Branch `feat/idun-phase4-1`):**
+   Tab + Chat live verifiziert — dient nur als Referenz, wird NICHT verfolgt
+   und NICHT nach GitHub gepusht. HTTPS-Verbindung/Upstream-Commits: keiner.
 2. **Wiederverwendbare Tool-Agent-Visualisierung (4.2)** — **ERLEDIGT:**
    `trace-viz.js` + `trace-viz.css` (stdlib ES, keine Deps) rendern eine
    Agent-Trajectory (reasoning + tool steps) in beliebige Container und nutzen
@@ -92,10 +91,9 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 
 ## Nächste unblockierte Schritte (Priorität)
 
-- **A / A'** — Phase 4.1 WebUI: **BACK-BURNER.** PoC verifiziert
-  (`feat/idun-phase4-1`: Tab + Chat live). Keine weitere WebUI-Arbeit —
-  zu große Baustelle (fremdes Repo, AGENTS.md-Constraints). Nur wieder
-  aufnehmen, falls du die WebUI-Integration wirklich willst.
+- **A / A'** — Phase 4.1 WebUI: **NICHT GEPLANT.** Bewusst verzichtet —
+  Integration läuft via MCP (`idun`/`idun-docs`) + eigenständigem Playground.
+  Kein WebUI-Code auf GitHub, PoC nur lokal als Referenz.
 - **B** — Phase 4.2: Tool-Agent-Visualisierung als wiederverwendbare
   Komponente (`trace-viz.js`/`.css`, in playground + diff genutzt). ✓ ERLEDIGT.
 - **C** — Extern: PR #4249 / 365-Kalender (blockiert, nur Nachfassen).
