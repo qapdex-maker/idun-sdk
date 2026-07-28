@@ -51,14 +51,16 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 
 ## Phase 4 — Vision
 
-1. **Idun als Backend in Hermes WebUI (4.1)** — **ERLEDIGT (Backend):**
+1. **Idun als Backend in Hermes WebUI (4.1)** — **ERLEDIGT:**
    `api/idun.py` + Dispatch in `handle_post` (`/api/idun/chat`,
    `/api/idun/diff`). Chat-Endpoint **live verifiziert** (200, echte
-   Foundry-Antwort). Diff-Endpoint funktional, aber langsam unter hoher
-   Foundry-Latenz (2× sequenzielle Calls, Retry bei transientem 500).
-   Committet auf Branch `feat/idun-phase4-1` in `~/repo/own/hermes-webui`.
-   **Offen:** sichtbarer UI-Tab (`idun.html` im Foundry-Look) — aktuell
-   nur API-Ebene, kein Button in der WebUI.
+   Foundry-Antwort). Zusätzlich **sichtbarer UI-Tab**: `static/idun.html`
+   (dark ai.azure.com-Look) + `GET /idun` Route (servt idun.html) +
+   JS → `POST /api/idun/chat`. Committet auf Branch `feat/idun-phase4-1`
+   in `~/repo/own/hermes-webui`.
+   **Offen:** FOUNDRY-Token expired → Chat hängt am device-code login
+   (Code OK, nur Auth-State). Diff-Endpoint funktional, aber langsam
+   unter hoher Foundry-Latenz (2× seq. Calls, Retry bei transientem 500).
 2. **Wiederverwendbare Tool-Agent-Visualisierung (4.2)** — Komponente für
    andere Foundry-Agents. (offen)
 3. **Streaming (SSE) (4.3)** — `router.py /api/chat/stream` (NDJSON) +
@@ -82,8 +84,9 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 ## Nächste unblockierte Schritte (Priorität)
 
 - **A** — Phase 4.1 UI: sichtbarer "Idun Agent"-Tab in Hermes WebUI
-  (`idun.html` im Foundry-Look + `GET /idun` Route + JS → `POST /api/idun/chat`).
-  Macht Idun im Browser klickbar, nicht nur API.
+  (`idun.html` + `GET /idun` Route + JS → `POST /api/idun/chat`). ✓ ERLEDIGT.
+- **A'** — FOUNDRY-Token refreshen (device-code login), dann Idun-Chat
+  im WebUI-Tab live mit echtem Token verifizieren.
 - **B** — Phase 4.2: Tool-Agent-Visualisierung als wiederverwendbare Komponente.
 - **C** — Extern: PR #4249 / 365-Kalender (blockiert, nur Nachfassen).
 - **D** — Optional: Diff-Endpoint Performance (parallel Calls / SSE-Streaming
