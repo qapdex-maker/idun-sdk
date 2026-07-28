@@ -9,12 +9,9 @@ reviews:
   auto_review:
     enabled: true
     drafts: true
-  # Path filters — keep SDK core in scope.
-  path_filters:
-    - "idun/*.py"
-    - "idun_cli.py"
-    - "idun_mcp.py"
-    - "tests/*.py"
+  # No path_filters: diff_scope already restricts to changed files. An explicit
+  # allow-list here would silently skip reviews on other files (setup.py,
+  # README, etc.). CodeRabbit's default block-list still applies.
   # Reduce noise: ignore known stdlib-only false positives.
   ignore:
     # We deliberately avoid requests/httpx/azure-identity (Termux/Android headless).
