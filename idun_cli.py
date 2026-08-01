@@ -19,6 +19,7 @@ import time
 from idun import IdunClient, login as do_login, load_token, logo_path
 from idun.client import IdunResult
 from idun.auth import maybe_refresh, _load_meta, REFRESH_SLACK
+from idun.welcome import maybe_welcome, show_welcome
 
 BANNER = r"""
  ___    ___  _  _  _   _  _ _  _  _  _  ___  ___  ___
@@ -78,6 +79,10 @@ def cmd_logo(_args):
     print("Logo assets bundled with this package:")
     print(f"  white : {logo_path('white')}")
     print(f"  color : {logo_path('color')}")
+
+
+def cmd_welcome(_args):
+    show_welcome(force_cmatrix=True)
 
 
 def cmd_token(args):
@@ -148,6 +153,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("logo", help="show bundled Foundry logo paths").set_defaults(func=cmd_logo)
 
+    sub.add_parser("welcome", help="show the Idun welcome (banner + matrix)").set_defaults(func=cmd_welcome)
+
     pc = sub.add_parser("chat", help="print final answer")
     pc.add_argument("prompt")
     pc.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
@@ -202,6 +209,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main():
+    maybe_welcome()
     args = build_parser().parse_args()
     args.func(args)
 

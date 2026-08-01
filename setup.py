@@ -1,5 +1,40 @@
 from setuptools import setup, find_packages
 import os
+import sys
+
+# Sdist install banner. Wheels cannot run code on install (PEP 427), so this
+# only appears for source builds (`pip install --no-binary` / local `pip install .`).
+_INSTALL_BANNER = (
+    "\033[38;5;141m"
+    "  ___ _    ___ _  _  _   _ _____ _    ___\n"
+    " |_ _| |  |_ _| \\| |/ \\| | |_   _| |  | __|\n"
+    "  | || |__ | || .` / _ \\ |   | | | |__| _|\n"
+    " |___|____|___|_|\\/_/ \\_\\_|  |_| |____|___|\n"
+    "\033[0m"
+    "  \033[38;5;57mNatureLM-Idun-5-MoE  ·  Azure AI Foundry\033[0m\n"
+    "  \033[38;5;141midun-sdk\033[0m installed — run `idun welcome` for the full intro.\n"
+)
+
+
+def _print_banner():
+    try:
+        sys.stdout.write(_INSTALL_BANNER + "\n")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
+try:
+    from setuptools.command.install import install as _install
+
+    class _BannerInstall(_install):
+        def run(self):
+            _print_banner()
+            super().run()
+except Exception:
+    _BannerInstall = None
+
+_cmdclass = {"install": _BannerInstall} if _BannerInstall else {}
 
 this_dir = os.path.dirname(os.path.abspath(__file__))
 readme_path = os.path.join(this_dir, "README.md")
@@ -8,7 +43,7 @@ with open(readme_path, encoding="utf-8") as f:
 
 setup(
     name="idun-sdk",
-    version="0.1.18",
+    version="0.1.19",
     description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
@@ -27,6 +62,7 @@ setup(
     python_requires=">=3.8",
     # stdlib-only: no runtime dependencies. Works headless on Termux.
     install_requires=[],
+    cmdclass=_cmdclass,
     entry_points={"console_scripts": ["idun=idun_cli:main"]},
     keywords=[
         "azure", "ai-foundry", "azure-ai-foundry", "agent", "tool-agent",
