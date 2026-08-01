@@ -106,3 +106,24 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 - **C** — Extern: PR #4249 / 365-Kalender (blockiert, nur Nachfassen).
 - **D** — Optional: Diff-Endpoint Performance (parallel Calls / SSE-Streaming
   für Diff) wenn Foundry-Latenz ein Problem wird.
+
+## Phase 6 — Idun als lebendiger Tool-Agent (ERLEDIGT, v0.1.21)
+
+Idun ist jetzt als MCP-Server im Hermes-Ökosystem registriert, nicht nur als
+CLI/Playground. Damit schließt sich die Agent-zu-Agent-Schleife.
+
+1. **`idun-mcp` als `console_scripts`-Entry-Point** (`idun_mcp:main`) — kein
+   hart-codierter Pfad mehr nötig; `hermes mcp add idun --command idun-mcp`.
+2. **MCP-Tool-Surface erweitert** (6 Tools, stdlib JSON-RPC): `idun_chat`,
+   `idun_trace`, `idun_export` (json|md), `idun_diff` (json|md),
+   `idun_packs`, `idun_run`. Deckt jetzt die Auditing-Features des SDK ab.
+3. **Headless-sicher**: `main()` liest das Token nur noch nicht-blockierend aus
+   der Datei (kein `maybe_refresh()` → kein interaktiver Device-Code-Login im
+   Hintergrund). Abgelaufenes/fehlendes Token → sauberer "no token"-Fehler.
+4. **Bei Hermes registriert**: `hermes mcp add idun` → 6/6 Tools enabled
+   (`~/.hermes/profiles/microsoft/config.yaml`). Tools sind nach NEUER Session
+   verfügbar.
+5. **PyPI** `v0.1.21` live (Wheel + Sdist), commit `bfc45e1`.
+
+Offen (nicht blockierend): die `idun`-MCP-Tools im Hermes-Chat selbst live
+testen (braucht gültiges FOUNDRY_TOKEN → `idun login` im Browser).
