@@ -43,7 +43,7 @@ with open(readme_path, encoding="utf-8") as f:
 
 setup(
     name="idun-sdk",
-    version="0.1.19",
+    version="0.1.20",
     description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
@@ -63,7 +63,7 @@ setup(
     # stdlib-only: no runtime dependencies. Works headless on Termux.
     install_requires=[],
     cmdclass=_cmdclass,
-    entry_points={"console_scripts": ["idun=idun_cli:main"]},
+    entry_points={"console_scripts": ["idun=idun_cli:main", "idun-mcp=idun_mcp:main"]},
     keywords=[
         "azure", "ai-foundry", "azure-ai-foundry", "agent", "tool-agent",
         "mcp", "model-context-protocol", "naturelm", "idun", "llm",

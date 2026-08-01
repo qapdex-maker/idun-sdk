@@ -44,23 +44,101 @@ TOOLS = [
             "required": ["prompt"],
         },
     },
+    {
+        "name": "idun_export",
+        "description": ("Run a prompt and return the full agent trajectory as JSON or "
+                        "human-readable Markdown (for archival / audit)."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "The user prompt."},
+                "format": {"type": "string", "enum": ["json", "md"], "default": "json",
+                           "description": "Output format."},
+            },
+            "required": ["prompt"],
+        },
+    },
+    {
+        "name": "idun_diff",
+        "description": ("Compare two prompts' agent trajectories side-by-side and return "
+                        "shared / unique tool queries and whether the final answer matches."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt_a": {"type": "string", "description": "First prompt."},
+                "prompt_b": {"type": "string", "description": "Second prompt."},
+                "format": {"type": "string", "enum": ["json", "md"], "default": "md",
+                           "description": "Diff output format."},
+            },
+            "required": ["prompt_a", "prompt_b"],
+        },
+    },
+    {
+        "name": "idun_packs",
+        "description": "List the available bundled prompt packs (name, count, title).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "idun_run",
+        "description": "Run a prompt from a bundled pack by name + key.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pack": {"type": "string", "description": "Pack name, e.g. 'contoso'."},
+                "key": {"type": "string", "description": "Prompt key inside the pack."},
+            },
+            "required": ["pack", "key"],
+        },
+    },
 ]
 
 
+def _client():
+    return IdunClient()
+
+
 def _tool_chat(prompt):
-    cli = IdunClient()
-    res = dict(cli.complete(prompt))
+    res = dict(_client().complete(prompt))
     return res.get("text", "")
 
 
 def _tool_trace(prompt):
-    cli = IdunClient()
-    res = dict(cli.complete(prompt))
+    res = dict(_client().complete(prompt))
     return {
         "text": res.get("text", ""),
         "steps": res.get("steps", []),
         "model": res.get("model", ""),
     }
+
+
+def _tool_export(prompt, fmt="json"):
+    from idun import IdunResult
+    res = _client().complete(prompt)
+    if fmt == "md":
+        return res.to_markdown()
+    return res.to_json()
+
+
+def _tool_diff(prompt_a, prompt_b, fmt="md"):
+    from idun import diff_traces, format_diff
+    ra = _client().complete(prompt_a)
+    rb = _client().complete(prompt_b)
+    d = diff_traces(ra, rb)
+    return format_diff(d, fmt)
+
+
+def _tool_packs():
+    from idun import list_packs
+    return list_packs()
+
+
+def _tool_run(pack, key):
+    from idun import get_prompt
+    prompt = get_prompt(pack, key)
+    return _tool_chat(prompt)
 
 
 def _dispatch(req):
@@ -74,7 +152,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.0"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.20"},
             },
         }
     if method == "notifications/initialized":
@@ -91,6 +169,19 @@ def _dispatch(req):
             elif name == "idun_trace":
                 out = _tool_trace(args.get("prompt", ""))
                 content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
+            elif name == "idun_export":
+                out = _tool_export(args.get("prompt", ""), args.get("format", "json"))
+                content = [{"type": "text", "text": str(out)}]
+            elif name == "idun_diff":
+                out = _tool_diff(args.get("prompt_a", ""), args.get("prompt_b", ""),
+                                  args.get("format", "md"))
+                content = [{"type": "text", "text": str(out)}]
+            elif name == "idun_packs":
+                out = _tool_packs()
+                content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
+            elif name == "idun_run":
+                out = _tool_run(args.get("pack", ""), args.get("key", ""))
+                content = [{"type": "text", "text": str(out)}]
             else:
                 raise ValueError(f"unknown tool: {name}")
             return {"jsonrpc": "2.0", "id": rid, "result": {"content": content}}
