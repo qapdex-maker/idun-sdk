@@ -152,7 +152,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.20"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.21"},
             },
         }
     if method == "notifications/initialized":
@@ -195,6 +195,22 @@ def _dispatch(req):
 
 
 def main():
+    # Provide a token if one is already stored and still valid. We do NOT call
+    # load_token()/maybe_refresh() here: that would trigger an interactive
+    # device-code login on an expired token, which hangs a headless MCP server.
+    # A missing/invalid token simply yields a clean "no token" error on call.
+    if not os.environ.get("FOUNDRY_TOKEN"):
+        try:
+            from idun.auth import _load_meta
+            meta = _load_meta()
+            if meta:
+                exp = float(meta.get("expires_at", 0))
+                tok = meta.get("access_token", "")
+                # only use it if it is not already within the refresh slack
+                if tok and (exp - __import__("time").time()) > 300:
+                    os.environ["FOUNDRY_TOKEN"] = tok
+        except Exception:
+            pass
     for line in sys.stdin:
         line = line.strip()
         if not line:
