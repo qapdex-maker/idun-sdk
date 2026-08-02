@@ -227,7 +227,12 @@ class IdunClient:
                 return self._post_once(prompt, max_output_tokens)
             except urllib.error.HTTPError as e:
                 if e.code not in self._RETRYABLE or attempt == max_attempts - 1:
-                    body = e.read().decode("utf-8", "replace")[:400]
+                    body = ""
+                    if getattr(e, "fp", None) is not None:
+                        try:
+                            body = e.read().decode("utf-8", "replace")[:400]
+                        except Exception:
+                            body = ""
                     raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
                 last_err = e
                 sleep_s = 2 ** attempt

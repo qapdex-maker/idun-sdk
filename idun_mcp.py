@@ -185,8 +185,8 @@ def _tool_token():
         else:
             info["stored_token_present"] = False
             info["valid"] = False
-    except Exception as e:
-        info["error"] = str(e)[:200]
+    except (OSError, TypeError, ValueError) as e:
+        info["error"] = "token metadata unavailable"
     return info
 
 
