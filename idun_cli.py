@@ -128,7 +128,17 @@ def cmd_packs(_args):
 
 
 def cmd_run(args):
-    from idun import get_prompt
+    from idun import get_prompt, run_pack
+    if args.all:
+        if args.key:
+            sys.exit("--all and KEY are mutually exclusive")
+        results = run_pack(args.pack, keys=None, max_output_tokens=args.max_tokens)
+        for key, res in results:
+            print(f"\n=== {key} ===")
+            print(res.text)
+        return
+    if not args.key:
+        sys.exit("either KEY or --all is required")
     try:
         prompt = get_prompt(args.pack, args.key)
     except (FileNotFoundError, KeyError) as e:
@@ -188,9 +198,12 @@ def build_parser() -> argparse.ArgumentParser:
     pk = sub.add_parser("packs", help="list available prompt packs")
     pk.set_defaults(func=cmd_packs)
 
-    pr = sub.add_parser("run", help="run a prompt from a pack")
+    pr = sub.add_parser("run", help="run a prompt from a pack (or --all for the whole pack)")
     pr.add_argument("pack", help="pack name (e.g. contoso)")
-    pr.add_argument("key", help="prompt key inside the pack")
+    pr.add_argument("key", nargs="?", default=None,
+                    help="prompt key inside the pack (omit with --all to run every prompt)")
+    pr.add_argument("--all", action="store_true", dest="all",
+                    help="run ALL prompts in the pack (batch)")
     pr.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
     pr.add_argument("--async", action="store_true", dest="async_",
                     help="use the asyncio variant (run_in_executor, no extra deps)")
