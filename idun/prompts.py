@@ -55,11 +55,13 @@ def get_prompt(name: str, key: str) -> str:
 
 
 def run_pack(name: str, keys=None, client=None, max_output_tokens: int = 4096):
-    """Run one or many prompts from a pack and return (key, IdunResult) pairs.
+    """Run one or many prompts from a pack and return (key, result) pairs.
 
     keys=None (default) runs EVERY prompt in the pack (batch). Pass a list to
-    run a subset. Returns a list of (key, IdunResult). Network/offline: the
-    client call is the only live part; pack loading + key resolution are offline.
+    run a subset. Returns a list of (key, result) where result is either an
+    IdunResult (success) or an Exception (that prompt failed — the rest of the
+    batch still completes). Network/offline: the client call is the only live
+    part; pack loading + key resolution are offline.
     """
     from .client import IdunClient
     pack = load_pack(name)
@@ -71,5 +73,11 @@ def run_pack(name: str, keys=None, client=None, max_output_tokens: int = 4096):
         selected = [(k, by_key[k]) for k in keys]
     if client is None:
         client = IdunClient()
-    return [(k, client.complete(prompt, max_output_tokens)) for k, prompt in selected]
+    out = []
+    for k, prompt in selected:
+        try:
+            out.append((k, client.complete(prompt, max_output_tokens)))
+        except Exception as e:  # one bad prompt must not kill the whole batch
+            out.append((k, e))
+    return out
 

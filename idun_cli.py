@@ -134,6 +134,9 @@ def cmd_run(args):
             sys.exit("--all and KEY are mutually exclusive")
         results = run_pack(args.pack, keys=None, max_output_tokens=args.max_tokens)
         for key, res in results:
+            if isinstance(res, Exception):
+                print(f"\n=== {key} ===\n[ERROR] {res}")
+                continue
             print(f"\n=== {key} ===")
             print(res.text)
         return

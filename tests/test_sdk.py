@@ -325,3 +325,29 @@ def test_run_pack_batch_offline(monkeypatch):
     assert len(sub) == 2
     assert sub[0][0] == "esg_check"
     assert sub[1][0] == "sustainability_summary"
+
+
+def test_run_pack_isolates_failures(monkeypatch):
+    """A failing prompt returns an Exception in the pair; the batch continues."""
+    from idun import IdunClient, run_pack
+    import urllib.error
+    c = IdunClient(token="fake")
+
+    def fake_post(self, prompt, max_tokens):
+        if "boom" in prompt:
+            raise urllib.error.HTTPError(c._url(), 400, "bad", {}, None)
+        return {"model": "m", "output": [
+            {"type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "ok"}]}]}
+
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    # contoso pack, but inject a failing prompt via keys we control
+    results = run_pack("contoso", keys=["esg_check"], client=c)
+    assert len(results) == 1
+    assert not isinstance(results[0][1], Exception)
+    # craft a pack entry that fails: reuse run_pack with a client that always 400s
+    def always_fail(self, prompt, max_tokens):
+        raise urllib.error.HTTPError(c._url(), 400, "bad", {}, None)
+    monkeypatch.setattr(IdunClient, "_post_once", always_fail)
+    res2 = run_pack("contoso", keys=["esg_check"], client=c)
+    assert isinstance(res2[0][1], Exception)

@@ -9,7 +9,7 @@ from .prompts import list_packs, load_pack, get_prompt, run_pack
 __all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_refresh",
            "_normalize_output", "logo_path", "list_packs", "load_pack", "get_prompt",
            "diff_traces", "format_diff", "Conversation", "run_pack"]
-__version__ = "0.1.24"
+__version__ = "0.1.25"
 
 
 def logo_path(variant: str = "white") -> str:
