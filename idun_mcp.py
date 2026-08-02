@@ -185,8 +185,8 @@ def _tool_token():
         else:
             info["stored_token_present"] = False
             info["valid"] = False
-    except (OSError, TypeError, ValueError) as e:
-        info["error"] = "token metadata unavailable"
+    except Exception as e:
+        info["error"] = str(e)[:200]
     return info
 
 
@@ -201,7 +201,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.26"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.25"},
             },
         }
     if method == "notifications/initialized":
