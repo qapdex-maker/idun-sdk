@@ -154,7 +154,13 @@ def _tool_run(pack, key=None, keys=None, all_pack=False):
     if all_pack or keys:
         selected = None if all_pack else (keys or [])
         results = run_pack(pack, keys=selected)
-        return [{"key": k, "text": r.text} for k, r in results]
+        out = []
+        for k, r in results:
+            if isinstance(r, Exception):
+                out.append({"key": k, "error": str(r)})
+            else:
+                out.append({"key": k, "text": r.text})
+        return out
     # single-key path
     prompt = get_prompt(pack, key)
     return _tool_chat(prompt)
@@ -195,7 +201,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.24"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.25"},
             },
         }
     if method == "notifications/initialized":
