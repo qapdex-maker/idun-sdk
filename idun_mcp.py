@@ -93,6 +93,16 @@ TOOLS = [
             "required": ["pack", "key"],
         },
     },
+    {
+        "name": "idun_token",
+        "description": ("Inspect the stored Foundry token state WITHOUT exposing the secret. "
+                        "Returns validity, seconds-until-expiry, and (if present) the account UPN. "
+                        "Use this to debug auth before calling the agent tools."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
 ]
 
 
@@ -141,6 +151,30 @@ def _tool_run(pack, key):
     return _tool_chat(prompt)
 
 
+def _tool_token():
+    """Inspect token state without leaking the secret."""
+    import time
+    info = {"has_env_token": bool(os.environ.get("FOUNDRY_TOKEN"))}
+    try:
+        from idun.auth import _load_meta
+        meta = _load_meta()
+        if meta:
+            exp = float(meta.get("expires_at", 0))
+            left = exp - time.time()
+            info["stored_token_present"] = bool(meta.get("access_token"))
+            info["expires_in_seconds"] = int(left)
+            info["valid"] = left > 300
+            acct = meta.get("account_upn") or meta.get("username")
+            if acct:
+                info["account"] = acct
+        else:
+            info["stored_token_present"] = False
+            info["valid"] = False
+    except Exception as e:
+        info["error"] = str(e)[:200]
+    return info
+
+
 def _dispatch(req):
     method = req.get("method")
     rid = req.get("id")
@@ -152,7 +186,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.21"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.22"},
             },
         }
     if method == "notifications/initialized":
@@ -182,6 +216,9 @@ def _dispatch(req):
             elif name == "idun_run":
                 out = _tool_run(args.get("pack", ""), args.get("key", ""))
                 content = [{"type": "text", "text": str(out)}]
+            elif name == "idun_token":
+                out = _tool_token()
+                content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
             else:
                 raise ValueError(f"unknown tool: {name}")
             return {"jsonrpc": "2.0", "id": rid, "result": {"content": content}}

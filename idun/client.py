@@ -208,11 +208,40 @@ class IdunClient:
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             return json.loads(resp.read())
 
+    # Transient server errors that are worth retrying (Foundry returns these
+    # intermittently — observed live as bare HTTP 500 with no body). 401 is NOT
+    # here: that is a token problem, handled separately by maybe_refresh().
+    _RETRYABLE = {500, 502, 503, 429}
+
+    def _post_with_retry(self, prompt: str, max_output_tokens: int,
+                         max_attempts: int = 3) -> dict:
+        """POST with exponential backoff on transient 5xx / 429.
+
+        A retryable HTTPError sleeps 2**attempt seconds and retries; after
+        max_attempts it re-raises with the last body. Non-retryable errors
+        (e.g. 400 invalid_payload, 401) propagate immediately.
+        """
+        last_err: Optional[urllib.error.HTTPError] = None
+        for attempt in range(max_attempts):
+            try:
+                return self._post_once(prompt, max_output_tokens)
+            except urllib.error.HTTPError as e:
+                if e.code not in self._RETRYABLE or attempt == max_attempts - 1:
+                    body = e.read().decode("utf-8", "replace")[:400]
+                    raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
+                last_err = e
+                sleep_s = 2 ** attempt
+                time.sleep(sleep_s)
+        # should be unreachable (loop always raises on last attempt), but keep
+        # mypy happy
+        raise last_err or RuntimeError("retry loop exited without result")
+
     def complete(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
         """Synchronous completion. Returns final text + agent trajectory.
 
         Phase 2.5: rotates the Entra token before the call (silent refresh when
         a refresh_token is stored) and retries once on HTTP 401 (expired token).
+        Transient 5xx / 429 are retried with backoff (see _post_with_retry).
         """
         from .auth import maybe_refresh  # lazy import keeps install_requires=[]
 
@@ -222,23 +251,22 @@ class IdunClient:
             self.token = refreshed
 
         try:
-            data = self._post_once(prompt, max_output_tokens)
-        except urllib.error.HTTPError as e:
-            if e.code == 401:
-                # token may have just expired -> one forced rotation + retry
+            data = self._post_with_retry(prompt, max_output_tokens)
+        except RuntimeError as re:
+            # RuntimeError from _post_with_retry may wrap a 401 — unwrap and
+            # apply the token-rotation retry path.
+            if "Foundry HTTP 401" in str(re):
                 rotated = maybe_refresh(force=True)
                 if rotated:
                     self.token = rotated
                     try:
-                        data = self._post_once(prompt, max_output_tokens)
-                    except urllib.error.HTTPError as e2:
-                        body = e2.read().decode("utf-8", "replace")[:400]
-                        raise RuntimeError(f"Foundry HTTP {e2.code} after token refresh: {body}") from e2
+                        data = self._post_with_retry(prompt, max_output_tokens)
+                    except RuntimeError as re2:
+                        raise
                 else:
                     raise
             else:
-                body = e.read().decode("utf-8", "replace")[:400]
-                raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
+                raise
         return _normalize_output(data)
 
     async def complete_async(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
@@ -246,7 +274,8 @@ class IdunClient:
 
         Stdlib-only: the blocking urllib call runs in the default executor so
         the surrounding asyncio loop stays responsive (no httpx/aiohttp dep).
-        Rotates the token (sync, fast) before the call; on 401 it retries once.
+        Rotates the token (sync, fast) before the call; transient 5xx/429 use
+        backoff; on 401 it retries once after a forced token rotation.
         """
         from .auth import maybe_refresh  # lazy import keeps install_requires=[]
 
@@ -254,26 +283,71 @@ class IdunClient:
         if refreshed:
             self.token = refreshed
 
-        # get_running_loop() is the correct call inside a coroutine: it raises a
-        # clear RuntimeError if no loop is active instead of silently creating a
-        # new one (asyncio.get_event_loop() is deprecated and can return a wrong
-        # loop on 3.12+). The caller is responsible for providing the loop.
         loop = asyncio.get_running_loop()
         try:
-            data = await loop.run_in_executor(None, self._post_once, prompt, max_output_tokens)
-        except urllib.error.HTTPError as e:
-            if e.code == 401:
+            data = await loop.run_in_executor(None, self._post_with_retry, prompt, max_output_tokens)
+        except RuntimeError as re:
+            if "Foundry HTTP 401" in str(re):
                 rotated = maybe_refresh(force=True)
                 if rotated:
                     self.token = rotated
                     try:
-                        data = await loop.run_in_executor(None, self._post_once, prompt, max_output_tokens)
-                    except urllib.error.HTTPError as e2:
-                        body = e2.read().decode("utf-8", "replace")[:400]
-                        raise RuntimeError(f"Foundry HTTP {e2.code} after token refresh: {body}") from e2
+                        data = await loop.run_in_executor(None, self._post_with_retry, prompt, max_output_tokens)
+                    except RuntimeError:
+                        raise
                 else:
                     raise
             else:
-                body = e.read().decode("utf-8", "replace")[:400]
-                raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
+                raise
         return _normalize_output(data)
+
+
+class Conversation:
+    """Minimal multi-turn wrapper around IdunClient.
+
+    IdunClient.complete() is stateless (each call is an isolated prompt). This
+    wrapper keeps a local history and threads it into the next call as a
+    structured text prefix, so the agent "remembers" prior turns without
+    relying on server-side session state (which the openai/responses endpoint
+    here does not expose). Offline-friendly: history is plain strings.
+
+    Usage:
+        conv = Conversation(client)
+        r1 = conv.ask("What is the capital of France?")
+        r2 = conv.ask("And what is its population?")  # sees turn 1
+        conv.history  # list of (role, text)
+    """
+
+    def __init__(self, client: "IdunClient", max_output_tokens: int = 4096) -> None:
+        self.client = client
+        self.max_output_tokens = max_output_tokens
+        self.history: List[tuple] = []  # (role, text)
+
+    def _render(self, prompt: str) -> str:
+        if not self.history:
+            return prompt
+        parts = ["Previous conversation:"]
+        for role, text in self.history:
+            parts.append(f"[{role}] {text.strip()}")
+        parts.append(f"[user] {prompt.strip()}")
+        parts.append("")
+        parts.append("Answer the latest [user] message, using the context above.")
+        return "\n".join(parts)
+
+    def ask(self, prompt: str, max_output_tokens: Optional[int] = None) -> IdunResult:
+        """Ask a follow-up; records both sides in history. Returns IdunResult."""
+        full = self._render(prompt)
+        res = self.client.complete(full, max_output_tokens or self.max_output_tokens)
+        self.history.append(("user", prompt))
+        self.history.append(("assistant", res.text))
+        return res
+
+    async def ask_async(self, prompt: str, max_output_tokens: Optional[int] = None) -> IdunResult:
+        full = self._render(prompt)
+        res = await self.client.complete_async(full, max_output_tokens or self.max_output_tokens)
+        self.history.append(("user", prompt))
+        self.history.append(("assistant", res.text))
+        return res
+
+    def clear(self) -> None:
+        self.history.clear()
