@@ -111,16 +111,16 @@ def _client():
 
 
 def _tool_chat(prompt):
-    res = dict(_client().complete(prompt))
-    return res.get("text", "")
+    res = _client().complete(prompt)
+    return res.text
 
 
 def _tool_trace(prompt):
-    res = dict(_client().complete(prompt))
+    res = _client().complete(prompt)
     return {
-        "text": res.get("text", ""),
-        "steps": res.get("steps", []),
-        "model": res.get("model", ""),
+        "text": res.text,
+        "steps": [s.__dict__ for s in res.steps],
+        "model": res.model,
     }
 
 
@@ -186,7 +186,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.22"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.23"},
             },
         }
     if method == "notifications/initialized":
