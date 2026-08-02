@@ -216,3 +216,88 @@ def test_cli_diff_subcommand():
     assert a.prompt_a == "Prompt A"
     assert a.prompt_b == "Prompt B"
     assert a.fmt == "json"
+
+
+def test_retry_backoff_on_transient_500(monkeypatch):
+    """_post_with_retry retries 500/502/503/429 with backoff, succeeds on 2nd try."""
+    from idun import IdunClient
+    import urllib.error
+    c = IdunClient(token="fake")
+    calls = {"n": 0}
+
+    def fake_post(self, prompt, max_tokens):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise urllib.error.HTTPError(c._url(), 500, "Server Error", {}, None)
+        return {"model": "gpt-x", "output": [
+            {"type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "Recovered"}]}]}
+
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    res = c.complete("test")
+    assert calls["n"] == 2, "should have retried once"
+    assert res.text == "Recovered"
+
+
+def test_retry_gives_up_after_max_attempts(monkeypatch):
+    """After max_attempts transient 5xx, raises RuntimeError with the code."""
+    from idun import IdunClient
+    import urllib.error
+    c = IdunClient(token="fake")
+    calls = {"n": 0}
+
+    def fake_post(self, prompt, max_tokens):
+        calls["n"] += 1
+        raise urllib.error.HTTPError(c._url(), 503, "Unavailable", {}, None)
+
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    try:
+        c.complete("test", 4096)
+        assert False, "expected RuntimeError"
+    except RuntimeError as e:
+        assert "503" in str(e)
+    assert calls["n"] == 3, "should attempt max_attempts=3 times"
+
+
+def test_non_retryable_400_propagates_immediately(monkeypatch):
+    """400 invalid_payload is NOT retried — fails on first attempt."""
+    from idun import IdunClient
+    import urllib.error
+    c = IdunClient(token="fake")
+    calls = {"n": 0}
+
+    def fake_post(self, prompt, max_tokens):
+        calls["n"] += 1
+        raise urllib.error.HTTPError(c._url(), 400, "Bad Request", {}, None)
+
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    try:
+        c.complete("test")
+        assert False, "expected RuntimeError"
+    except RuntimeError as e:
+        assert "400" in str(e)
+    assert calls["n"] == 1, "400 must not be retried"
+
+
+def test_conversation_threads_history(monkeypatch):
+    """Conversation.ask() prepends prior turns and records both sides."""
+    from idun import IdunClient, Conversation
+    c = IdunClient(token="fake")
+
+    def fake_post(self, prompt, max_tokens):
+        return {"model": "gpt-x", "output": [
+            {"type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "RESP:" + prompt[:40]}]}]}
+
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    conv = Conversation(c)
+    conv.ask("First question?")
+    assert len(conv.history) == 2  # user + assistant
+    conv.ask("Second question?")
+    assert len(conv.history) == 4
+    rendered = conv._render("probe")
+    assert "Previous conversation:" in rendered
+    assert "[user] First question?" in rendered
+    assert "[user] Second question?" in rendered
+    conv.clear()
+    assert conv.history == []
