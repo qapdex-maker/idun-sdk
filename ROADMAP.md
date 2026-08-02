@@ -125,5 +125,36 @@ CLI/Playground. Damit schließt sich die Agent-zu-Agent-Schleife.
    verfügbar.
 5. **PyPI** `v0.1.21` live (Wheel + Sdist), commit `bfc45e1`.
 
-Offen (nicht blockierend): die `idun`-MCP-Tools im Hermes-Chat selbst live
-testen (braucht gültiges FOUNDRY_TOKEN → `idun login` im Browser).
+## Evolve-Schritte A–D (2026-08-02, v0.1.22 + v0.1.23)
+
+SDK + MCP weiter ausgebaut und **live verifiziert** (pytest 18/18 grün, PyPI
+0.1.22/0.1.23 live, MCP-Tools via stdio-Wire getestet):
+
+- **A — SDK Resilience:** `IdunClient.complete()/complete_async()` retryen jetzt
+  transiente 5xx/429 mit exponential backoff (2**attempt s, max 3 Versuche).
+  Beobachtet live: Foundry wirft intermittente HTTP 500 → vorher harter Abbruch,
+  jetzt automatischer Retry. 401 (Token) bleibt separater Pfad (maybe_refresh).
+  Tests: `test_retry_backoff_on_transient_500`, `test_retry_gives_up_after_max_attempts`,
+  `test_non_retryable_400_propagates_immediately`.
+- **B — Multi-turn Conversation:** neue `Conversation`-Klasse (threaded history als
+  strukturierter Text-Präfix, offline-friendlich, kein Server-Session-State nötig).
+  `ask()` / `ask_async()` halten `history` (role, text). Getestet via
+  `test_conversation_threads_history`.
+- **D — MCP `idun_token` Tool + Diff-Parallelisierung:** `idun_token` inspiziert den
+  Token-State OHNE Secret (valid, expires_in_seconds, account). Router `/api/diff`
+  läuft beide Completions jetzt parallel (ThreadPoolExecutor, statt sequenziell).
+- **C — Live MCP-Test (Phase 6 offen, geschlossen):** `idun_chat`/`idun_trace`/
+  `idun_token` über das stdio-MCP-Wire getestet → echte Foundry-Antwort
+  ("Die Hauptstadt von Griechenland ist Athen."). Dabei Bug gefunden + gefixt:
+  `_tool_chat`/`_tool_trace` machten `dict(IdunResult)` (dataclass, nicht iterable)
+  → jetzt `res.text`/`res.steps`/`res.model` direkt (v0.1.23).
+
+PyPI: v0.1.22 (A+B+D) + v0.1.23 (C-Bugfix) live. idun-MCP bei Hermes: 7/7 Tools
+enabled (6 + idun_token). Hinweis: Hermes lädt das MCP-Binary erst nach NEUER
+Session / Reload — der in-session Call nutzt ggf. noch den Cache.
+
+Offen (unblockiert, optional):
+- `idun run` Batch (mehrere Pack-Keys / ganzer Pack auf einmal).
+- Strukturierter `input` als Message-Liste statt Text-Präfix (falls Foundry
+  server-seitige Conversation unterstützt).
+- Side-by-side-Diff als eigenes MCP-Tool (`idun_diff` existiert bereits als CLI).
