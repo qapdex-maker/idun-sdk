@@ -1,14 +1,15 @@
 """Idun SDK public API."""
 import os
 
-from .client import IdunClient, IdunResult, Step, _normalize_output, diff_traces, format_diff
+from .client import (IdunClient, IdunResult, Step, _normalize_output,
+                     diff_traces, format_diff, Conversation)
 from .auth import login, load_token, maybe_refresh
 from .prompts import list_packs, load_pack, get_prompt
 
 __all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_refresh",
            "_normalize_output", "logo_path", "list_packs", "load_pack", "get_prompt",
            "diff_traces", "format_diff"]
-__version__ = "0.1.21"
+__version__ = "0.1.22"
 
 
 def logo_path(variant: str = "white") -> str:
