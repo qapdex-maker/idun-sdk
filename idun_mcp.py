@@ -83,14 +83,18 @@ TOOLS = [
     },
     {
         "name": "idun_run",
-        "description": "Run a prompt from a bundled pack by name + key.",
+        "description": "Run a prompt from a bundled pack by name + key. For batch: pass 'keys' (array) to run several, or 'all'=true to run the entire pack.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "pack": {"type": "string", "description": "Pack name, e.g. 'contoso'."},
-                "key": {"type": "string", "description": "Prompt key inside the pack."},
+                "key": {"type": "string", "description": "Single prompt key (omit if using keys/all)."},
+                "keys": {"type": "array", "items": {"type": "string"},
+                         "description": "Multiple prompt keys to run as a batch."},
+                "all": {"type": "boolean", "default": False,
+                        "description": "Run every prompt in the pack."}
             },
-            "required": ["pack", "key"],
+            "required": ["pack"],
         },
     },
     {
@@ -145,8 +149,13 @@ def _tool_packs():
     return list_packs()
 
 
-def _tool_run(pack, key):
-    from idun import get_prompt
+def _tool_run(pack, key=None, keys=None, all_pack=False):
+    from idun import get_prompt, run_pack
+    if all_pack or keys:
+        selected = None if all_pack else (keys or [])
+        results = run_pack(pack, keys=selected)
+        return [{"key": k, "text": r.text} for k, r in results]
+    # single-key path
     prompt = get_prompt(pack, key)
     return _tool_chat(prompt)
 
@@ -170,8 +179,8 @@ def _tool_token():
         else:
             info["stored_token_present"] = False
             info["valid"] = False
-    except Exception as e:
-        info["error"] = str(e)[:200]
+    except (OSError, TypeError, ValueError) as e:
+        info["error"] = "token metadata unavailable"
     return info
 
 
@@ -186,7 +195,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.22"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.25"},
             },
         }
     if method == "notifications/initialized":
@@ -214,7 +223,8 @@ def _dispatch(req):
                 out = _tool_packs()
                 content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
             elif name == "idun_run":
-                out = _tool_run(args.get("pack", ""), args.get("key", ""))
+                out = _tool_run(args.get("pack", ""), key=args.get("key"),
+                                keys=args.get("keys"), all_pack=args.get("all", False))
                 content = [{"type": "text", "text": str(out)}]
             elif name == "idun_token":
                 out = _tool_token()
