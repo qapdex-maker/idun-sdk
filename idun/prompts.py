@@ -52,3 +52,24 @@ def get_prompt(name: str, key: str) -> str:
             return p["prompt"]
     available = ", ".join(p.get("key", "?") for p in pack.get("prompts", []))
     raise KeyError(f"Prompt key {key!r} not in pack {name!r}. Available: {available}")
+
+
+def run_pack(name: str, keys=None, client=None, max_output_tokens: int = 4096):
+    """Run one or many prompts from a pack and return (key, IdunResult) pairs.
+
+    keys=None (default) runs EVERY prompt in the pack (batch). Pass a list to
+    run a subset. Returns a list of (key, IdunResult). Network/offline: the
+    client call is the only live part; pack loading + key resolution are offline.
+    """
+    from .client import IdunClient
+    pack = load_pack(name)
+    prompts = pack.get("prompts", [])
+    if keys is None:
+        selected = [(p["key"], p["prompt"]) for p in prompts]
+    else:
+        by_key = {p["key"]: p["prompt"] for p in prompts}
+        selected = [(k, by_key[k]) for k in keys]
+    if client is None:
+        client = IdunClient()
+    return [(k, client.complete(prompt, max_output_tokens)) for k, prompt in selected]
+

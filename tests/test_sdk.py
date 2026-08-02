@@ -301,3 +301,27 @@ def test_conversation_threads_history(monkeypatch):
     assert "[user] Second question?" in rendered
     conv.clear()
     assert conv.history == []
+
+
+def test_run_pack_batch_offline(monkeypatch):
+    """run_pack(name, keys=None) runs every prompt; keys=[...] runs a subset."""
+    from idun import IdunClient, run_pack
+    c = IdunClient(token="fake")
+    seen = []
+
+    def fake_post(self, prompt, max_tokens):
+        seen.append(prompt)
+        return {"model": "m", "output": [
+            {"type": "message", "role": "assistant",
+             "content": [{"type": "output_text", "text": "R:" + prompt[:20]}]}]}
+
+    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    # all prompts in contoso pack
+    full = run_pack("contoso", keys=None, client=c)
+    assert len(full) == 4
+    assert all(isinstance(r, object) for _, r in full)
+    # subset by key
+    sub = run_pack("contoso", keys=["esg_check", "sustainability_summary"], client=c)
+    assert len(sub) == 2
+    assert sub[0][0] == "esg_check"
+    assert sub[1][0] == "sustainability_summary"
