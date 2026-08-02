@@ -222,13 +222,17 @@ def test_retry_backoff_on_transient_500(monkeypatch):
     """_post_with_retry retries 500/502/503/429 with backoff, succeeds on 2nd try."""
     from idun import IdunClient
     import urllib.error
+    import io
+    def mk_http(code, msg):
+        # portable HTTPError: fp must be a file-like, not None (3.8/3.9 strict)
+        return urllib.error.HTTPError("http://x", code, msg, {}, io.BytesIO(b""))
     c = IdunClient(token="fake")
     calls = {"n": 0}
 
     def fake_post(self, prompt, max_tokens):
         calls["n"] += 1
         if calls["n"] == 1:
-            raise urllib.error.HTTPError(c._url(), 500, "Server Error", {}, None)
+            raise mk_http(500, "Server Error")
         return {"model": "gpt-x", "output": [
             {"type": "message", "role": "assistant",
              "content": [{"type": "output_text", "text": "Recovered"}]}]}
@@ -243,12 +247,15 @@ def test_retry_gives_up_after_max_attempts(monkeypatch):
     """After max_attempts transient 5xx, raises RuntimeError with the code."""
     from idun import IdunClient
     import urllib.error
+    import io
+    def mk_http(code, msg):
+        return urllib.error.HTTPError("http://x", code, msg, {}, io.BytesIO(b""))
     c = IdunClient(token="fake")
     calls = {"n": 0}
 
     def fake_post(self, prompt, max_tokens):
         calls["n"] += 1
-        raise urllib.error.HTTPError(c._url(), 503, "Unavailable", {}, None)
+        raise mk_http(503, "Unavailable")
 
     monkeypatch.setattr(IdunClient, "_post_once", fake_post)
     try:
@@ -263,12 +270,15 @@ def test_non_retryable_400_propagates_immediately(monkeypatch):
     """400 invalid_payload is NOT retried — fails on first attempt."""
     from idun import IdunClient
     import urllib.error
+    import io
+    def mk_http(code, msg):
+        return urllib.error.HTTPError("http://x", code, msg, {}, io.BytesIO(b""))
     c = IdunClient(token="fake")
     calls = {"n": 0}
 
     def fake_post(self, prompt, max_tokens):
         calls["n"] += 1
-        raise urllib.error.HTTPError(c._url(), 400, "Bad Request", {}, None)
+        raise mk_http(400, "Bad Request")
 
     monkeypatch.setattr(IdunClient, "_post_once", fake_post)
     try:
