@@ -162,33 +162,61 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("login", help="device-code Entra login").set_defaults(func=cmd_login)
+    sub.add_parser(
+        "login",
+        help="device-code Entra login",
+        description="Authenticate against Entra and store the token in ~/foundry_token.txt.\n\nExample:\n  idun login",
+    ).set_defaults(func=cmd_login)
 
-    sub.add_parser("logo", help="show bundled Foundry logo paths").set_defaults(func=cmd_logo)
+    sub.add_parser(
+        "logo",
+        help="show bundled Foundry logo paths",
+        description="Print the on-disk paths of the bundled Idun/Foundry logo assets.\n\nExample:\n  idun logo",
+    ).set_defaults(func=cmd_logo)
 
-    sub.add_parser("welcome", help="show the Idun welcome (banner + matrix)").set_defaults(func=cmd_welcome)
+    sub.add_parser(
+        "welcome",
+        help="show the Idun welcome (banner + matrix)",
+        description="Render the Idun welcome screen (banner + matrix rain).\n\nExample:\n  idun welcome",
+    ).set_defaults(func=cmd_welcome)
 
-    pc = sub.add_parser("chat", help="print final answer")
+    pc = sub.add_parser(
+        "chat",
+        help="print final answer",
+        description="Send a prompt and print only the final answer text.\n\nExample:\n  idun chat \"What is the capital of France?\"\n  idun chat --max-tokens 2048 \"Summarize quantum computing\"\n  idun chat --async \"Explain transformers\"",
+    )
     pc.add_argument("prompt")
     pc.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
     pc.add_argument("--async", action="store_true", dest="async_",
                     help="use the asyncio variant (run_in_executor, no extra deps)")
     pc.set_defaults(func=cmd_chat)
 
-    pt = sub.add_parser("trace", help="print agent trajectory (steps)")
+    pt = sub.add_parser(
+        "trace",
+        help="print agent trajectory (steps)",
+        description="Send a prompt and print the full agent trajectory (reasoning + web_search steps).\n\nExample:\n  idun trace \"What is the capital of France?\"\n  idun trace --max-tokens 1024 \"Compare Python and Rust\"",
+    )
     pt.add_argument("prompt")
     pt.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
     pt.add_argument("--async", action="store_true", dest="async_",
                     help="use the asyncio variant (run_in_executor, no extra deps)")
     pt.set_defaults(func=cmd_trace)
 
-    ptok = sub.add_parser("token", help="inspect / rotate stored token")
+    ptok = sub.add_parser(
+        "token",
+        help="inspect / rotate stored token",
+        description="Inspect the stored Entra token, or force a rotation.\n\nExample:\n  idun token            # show status\n  idun token --refresh  # force rotate now\n  idun token -f",
+    )
     ptok.add_argument("--status", action="store_true", help="show token status (default)")
     ptok.add_argument("--refresh", action="store_true", help="force a token rotation now")
     ptok.add_argument("-f", "--force", action="store_true", dest="force", help="alias for --refresh")
     ptok.set_defaults(func=cmd_token)
 
-    pe = sub.add_parser("export", help="run prompt and save agent trajectory")
+    pe = sub.add_parser(
+        "export",
+        help="run prompt and save agent trajectory",
+        description="Run a prompt and export the full agent trajectory to JSON or markdown.\n\nExample:\n  idun export \"What is the capital of France?\" -o trace.md\n  idun export --format json \"Explain photosynthesis\" -o trace.json\n  idun export --async \"Tell me a joke\" > out.md",
+    )
     pe.add_argument("prompt")
     pe.add_argument("--format", choices=["json", "md"], default="json", dest="fmt",
                     help="json (full trajectory) or md (human-readable trace doc)")
@@ -198,10 +226,18 @@ def build_parser() -> argparse.ArgumentParser:
                     help="use the asyncio variant (run_in_executor, no extra deps)")
     pe.set_defaults(func=cmd_export)
 
-    pk = sub.add_parser("packs", help="list available prompt packs")
+    pk = sub.add_parser(
+        "packs",
+        help="list available prompt packs",
+        description="List all bundled prompt packs (name, prompt count, title).\n\nExample:\n  idun packs",
+    )
     pk.set_defaults(func=cmd_packs)
 
-    pr = sub.add_parser("run", help="run a prompt from a pack (or --all for the whole pack)")
+    pr = sub.add_parser(
+        "run",
+        help="run a prompt from a pack (or --all for the whole pack)",
+        description="Run a single prompt from a bundled pack, or the whole pack with --all.\n\nExample:\n  idun run contoso esg_check\n  idun run contoso --all\n  idun run contoso sustainability_summary --max-tokens 2048",
+    )
     pr.add_argument("pack", help="pack name (e.g. contoso)")
     pr.add_argument("key", nargs="?", default=None,
                     help="prompt key inside the pack (omit with --all to run every prompt)")
@@ -212,7 +248,11 @@ def build_parser() -> argparse.ArgumentParser:
                     help="use the asyncio variant (run_in_executor, no extra deps)")
     pr.set_defaults(func=cmd_run)
 
-    pd = sub.add_parser("diff", help="compare two prompt trajectories (side-by-side)")
+    pd = sub.add_parser(
+        "diff",
+        help="compare two prompt trajectories (side-by-side)",
+        description="Run two prompts and compare their agent trajectories side-by-side.\n\nExample:\n  idun diff \"Capital of France?\" \"Capital of Germany?\"\n  idun diff --format json \"A\" \"B\" > diff.json",
+    )
     pd.add_argument("prompt_a", metavar="PROMPT_A")
     pd.add_argument("prompt_b", metavar="PROMPT_B")
     pd.add_argument("--format", choices=["json", "md"], default="md", dest="fmt",
