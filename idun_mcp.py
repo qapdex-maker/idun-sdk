@@ -201,7 +201,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.27"},
+                "serverInfo": {"name": "idun-mcp", "version": "0.1.28"},
             },
         }
     if method == "notifications/initialized":

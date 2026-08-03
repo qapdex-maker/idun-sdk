@@ -291,26 +291,59 @@ def test_non_retryable_400_propagates_immediately(monkeypatch):
 
 def test_conversation_threads_history(monkeypatch):
     """Conversation.ask() prepends prior turns and records both sides."""
-    from idun import IdunClient, Conversation
+    from idun import IdunClient, Conversation, IdunResult
     c = IdunClient(token="fake")
 
-    def fake_post(self, prompt, max_tokens):
-        return {"model": "gpt-x", "output": [
-            {"type": "message", "role": "assistant",
-             "content": [{"type": "output_text", "text": "RESP:" + prompt[:40]}]}]}
+    def fake_complete_messages(self, messages, max_output_tokens=4096):
+        # echo the last user text so we can assert history threading
+        last = messages[-1]["content"][0]["text"]
+        return IdunResult(text="RESP:" + last, model="m", steps=[])
 
-    monkeypatch.setattr(IdunClient, "_post_once", fake_post)
+    monkeypatch.setattr(IdunClient, "complete_messages", fake_complete_messages)
     conv = Conversation(c)
     conv.ask("First question?")
     assert len(conv.history) == 2  # user + assistant
     conv.ask("Second question?")
     assert len(conv.history) == 4
-    rendered = conv._render("probe")
-    assert "Previous conversation:" in rendered
-    assert "[user] First question?" in rendered
-    assert "[user] Second question?" in rendered
-    conv.clear()
-    assert conv.history == []
+    # 2nd call passes 3 messages (user, assistant, user) — server-side context
+    conv2 = Conversation(c)
+    conv2.ask("A")
+    conv2.ask("B")
+    assert conv2.history[0] == ("user", "A")
+    assert conv2.history[1][0] == "assistant"
+    conv2.clear()
+    assert conv2.history == []
+
+
+def test_conversation_message_list_shape(monkeypatch):
+    """Conversation._to_messages builds a Foundry message-list (not a text prefix)."""
+    from idun import IdunClient, Conversation, IdunResult
+    c = IdunClient(token="fake")
+    conv = Conversation(c)
+    msgs = conv._to_messages([("user", "Q1"), ("assistant", "A1")], "Q2")
+    assert msgs == [
+        {"role": "user", "content": [{"type": "input_text", "text": "Q1"}]},
+        {"role": "assistant", "content": [{"type": "output_text", "text": "A1"}]},
+        {"role": "user", "content": [{"type": "input_text", "text": "Q2"}]},
+    ]
+
+
+def test_conversation_ask_uses_message_list(monkeypatch):
+    """Conversation.ask() passes a message-list to complete_messages (not a string)."""
+    from idun import IdunClient, Conversation, IdunResult
+    c = IdunClient(token="fake")
+    captured = {}
+
+    def fake_complete_messages(self, messages, max_output_tokens=4096):
+        captured["messages"] = messages
+        return IdunResult(text="RESP", model="m", steps=[])
+
+    monkeypatch.setattr(IdunClient, "complete_messages", fake_complete_messages)
+    conv = Conversation(c)
+    conv.ask("First?")
+    assert isinstance(captured["messages"], list)
+    assert captured["messages"][0]["role"] == "user"
+    assert captured["messages"][0]["content"][0]["type"] == "input_text"
 
 
 def test_run_pack_batch_offline(monkeypatch):

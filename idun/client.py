@@ -192,6 +192,9 @@ class IdunClient:
 
         Model MUST stay 'model-router' (agent name -> invalid_payload).
         No 'tools' key (agent owns capabilities -> 400 invalid_payload).
+        `input` may be a string (single-turn) or a list of message dicts
+        (multi-turn, server-side conversation state) — both verified live
+        against Foundry (HTTP 200 for both shapes).
         """
         return {
             "model": "model-router",
@@ -269,6 +272,61 @@ class IdunClient:
                 raise
         return _normalize_output(data)
 
+    def complete_messages(self, messages: list, max_output_tokens: int = 4096) -> IdunResult:
+        """Complete with a structured message list (server-side multi-turn).
+
+        `messages` is a list of {"role": "user"|"assistant", "content": [{"type":
+        "input_text"|"output_text", "text": ...}]}. Verified live: Foundry keeps
+        conversation state from the list (no text-prefix needed).
+        """
+        from .auth import maybe_refresh
+        refreshed = maybe_refresh()
+        if refreshed:
+            self.token = refreshed
+        try:
+            data = self._post_with_retry_messages(messages, max_output_tokens)
+        except RuntimeError as re:
+            if "Foundry HTTP 401" in str(re):
+                rotated = maybe_refresh(force=True)
+                if rotated:
+                    self.token = rotated
+                    try:
+                        data = self._post_with_retry_messages(messages, max_output_tokens)
+                    except RuntimeError:
+                        raise
+                else:
+                    raise
+            else:
+                raise
+        return _normalize_output(data)
+
+    def _post_once_messages(self, messages: list, max_output_tokens: int) -> dict:
+        payload = {
+            "model": "model-router",
+            "input": messages,
+            "max_output_tokens": max_output_tokens,
+        }
+        req = urllib.request.Request(
+            self._url(), data=json.dumps(payload).encode("utf-8"),
+            headers=self._headers(), method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            return json.loads(resp.read())
+
+    def _post_with_retry_messages(self, messages: list, max_output_tokens: int,
+                                 max_attempts: int = 3) -> dict:
+        last_err = None
+        for attempt in range(max_attempts):
+            try:
+                return self._post_once_messages(messages, max_output_tokens)
+            except urllib.error.HTTPError as e:
+                if e.code not in self._RETRYABLE or attempt == max_attempts - 1:
+                    body = e.read().decode("utf-8", "replace")[:400]
+                    raise RuntimeError(f"Foundry HTTP {e.code}: {body}") from e
+                last_err = e
+                time.sleep(2 ** attempt)
+        raise last_err or RuntimeError("retry loop exited without result")
+
     async def complete_async(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
         """Async variant of complete().
 
@@ -305,11 +363,10 @@ class IdunClient:
 class Conversation:
     """Minimal multi-turn wrapper around IdunClient.
 
-    IdunClient.complete() is stateless (each call is an isolated prompt). This
-    wrapper keeps a local history and threads it into the next call as a
-    structured text prefix, so the agent "remembers" prior turns without
-    relying on server-side session state (which the openai/responses endpoint
-    here does not expose). Offline-friendly: history is plain strings.
+    Uses Foundry's server-side conversation state via a structured message
+    list (role/content), NOT a text prefix. Verified live (2026-08-03): Foundry
+    accepts a list `input` and tracks multi-turn context from it. Offline-
+    friendly: history is plain (role, text) tuples until rendered to messages.
 
     Usage:
         conv = Conversation(client)
@@ -323,28 +380,37 @@ class Conversation:
         self.max_output_tokens = max_output_tokens
         self.history: List[tuple] = []  # (role, text)
 
-    def _render(self, prompt: str) -> str:
-        if not self.history:
-            return prompt
-        parts = ["Previous conversation:"]
-        for role, text in self.history:
-            parts.append(f"[{role}] {text.strip()}")
-        parts.append(f"[user] {prompt.strip()}")
-        parts.append("")
-        parts.append("Answer the latest [user] message, using the context above.")
-        return "\n".join(parts)
+    @staticmethod
+    def _to_messages(history: list, prompt: str) -> list:
+        """Build a Foundry message-list from (role, text) history + new prompt."""
+        msgs = []
+        for role, text in history:
+            ctype = "output_text" if role == "assistant" else "input_text"
+            msgs.append({
+                "role": role,
+                "content": [{"type": ctype, "text": text.strip()}],
+            })
+        msgs.append({
+            "role": "user",
+            "content": [{"type": "input_text", "text": prompt.strip()}],
+        })
+        return msgs
 
     def ask(self, prompt: str, max_output_tokens: Optional[int] = None) -> IdunResult:
         """Ask a follow-up; records both sides in history. Returns IdunResult."""
-        full = self._render(prompt)
-        res = self.client.complete(full, max_output_tokens or self.max_output_tokens)
+        messages = self._to_messages(self.history, prompt)
+        res = self.client.complete_messages(messages, max_output_tokens or self.max_output_tokens)
         self.history.append(("user", prompt))
         self.history.append(("assistant", res.text))
         return res
 
     async def ask_async(self, prompt: str, max_output_tokens: Optional[int] = None) -> IdunResult:
-        full = self._render(prompt)
-        res = await self.client.complete_async(full, max_output_tokens or self.max_output_tokens)
+        # sync call in executor keeps stdlib-only; message-list path is sync
+        loop = asyncio.get_running_loop()
+        messages = self._to_messages(self.history, prompt)
+        res = await loop.run_in_executor(
+            None, self.client.complete_messages, messages,
+            max_output_tokens or self.max_output_tokens)
         self.history.append(("user", prompt))
         self.history.append(("assistant", res.text))
         return res
