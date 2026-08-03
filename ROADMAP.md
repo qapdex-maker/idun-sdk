@@ -154,12 +154,10 @@ enabled (6 + idun_token). Hinweis: Hermes lädt das MCP-Binary erst nach NEUER
 Session / Reload — der in-session Call nutzt ggf. noch den Cache.
 
 Offen (unblockiert, optional):
-- ~~`idun run` Batch (mehrere Pack-Keys / ganzer Pack auf einmal).~~ **ERLEDIGT**
-  (v0.1.24: `run_pack(keys=None)` läuft ganzen Pack, `keys=[...]` Subset; CLI `--all`;
-  MCP `keys`/`all`. v0.1.25: `run_pack` isoliert per-Prompt-Fehler (Batch läuft bei 400 weiter).
-  Live bewiesen via stdio-MCP: `idun_run` mit 2 Keys → einer 200, einer graceful 400-error).
-- Strukturierter `input` als Message-Liste statt Text-Präfix (falls Foundry
-  server-seitige Conversation unterstützt).
+- ~~Strukturierter `input` als Message-Liste statt Text-Präfix (falls Foundry
+  server-seitige Conversation unterstützt).~~ **ERLEDIGT** (v0.1.28: `complete_messages()`
+  + `Conversation` baut Foundry-Message-List `[{role,content:[{type,text}]}]`; live
+  verifiziert dass Foundry Multi-Turn aus der Liste ableitet. 22/22 Tests grün.)
 - Side-by-side-Diff als eigenes MCP-Tool (`idun_diff` existiert bereits als CLI).
 
 ## Release-Historie (2026-08-02/03, live verifiziert)
@@ -169,6 +167,7 @@ Offen (unblockiert, optional):
 - **v0.1.24** — (3a) `idun run` Batch: `run_pack`, CLI `--all`, MCP `keys`/`all`.
 - **v0.1.25** — `run_pack` Resilienz (per-Prompt-Fehler isoliert).
 - **v0.1.26** — CR-Fixes (fp-None guard im retry, narrow token-inspect except). *Shadow-Release, nicht auf main gemergt.*
-- **v0.1.27** — Sync: main == PyPI (holt 0.1.26 CR-Fixes rein, Version-Konsistenz). **Aktueller Stand.**
+- **v0.1.27** — Sync: main == PyPI (holt 0.1.26 CR-Fixes rein, Version-Konsistenz).
+- **v0.1.28** — **Punkt 2**: `Conversation` nutzt server-side Message-Liste (kein Text-Präfix); `complete_messages()`. **Aktueller Stand.**
 - PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live.
 - CI: grün auf py3.8–3.12 (PR #4 gemergt, `4af7d02`).
