@@ -4,7 +4,8 @@ reviews:
   # Only review changed files in the PR (diff-scoped) — Flow 1.
   diff_scope: true
   # Fail/flag on criticals; do not auto-merge on critical findings.
-  severity_threshold: critical
+  severity_threshold: all
+  # (was: critical — lowered to 'all' for a full professional review pass)
   # Auto-review on every PR + every push to an open PR.
   auto_review:
     enabled: true
