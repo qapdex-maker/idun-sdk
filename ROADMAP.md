@@ -171,6 +171,6 @@ Offen (unblockiert, optional):
 - **v0.1.25** — `run_pack` Resilienz (per-Prompt-Fehler isoliert).
 - **v0.1.26** — CR-Fixes (fp-None guard im retry, narrow token-inspect except). *Shadow-Release, nicht auf main gemergt.*
 - **v0.1.27** — Sync: main == PyPI (holt 0.1.26 CR-Fixes rein, Version-Konsistenz).
-- **v0.1.28** — **Punkt 2**: `Conversation` nutzt server-side Message-Liste (kein Text-Präfix); `complete_messages()`. **Aktueller Stand.**
+- **v0.1.29** — CLI `--help` Examples für alle 10 Subcommands (argparse description). **Aktueller Stand.**
 - PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live.
 - CI: grün auf py3.8–3.12 (PR #4 gemergt, `4af7d02`).
