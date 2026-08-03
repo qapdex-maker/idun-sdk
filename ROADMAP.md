@@ -158,7 +158,10 @@ Offen (unblockiert, optional):
   server-seitige Conversation unterstützt).~~ **ERLEDIGT** (v0.1.28: `complete_messages()`
   + `Conversation` baut Foundry-Message-List `[{role,content:[{type,text}]}]`; live
   verifiziert dass Foundry Multi-Turn aus der Liste ableitet. 22/22 Tests grün.)
-- Side-by-side-Diff als eigenes MCP-Tool (`idun_diff` existiert bereits als CLI).
+- ~~Side-by-side-Diff als eigenes MCP-Tool (`idun_diff` existiert bereits als CLI).~~ **ERLEDIGT**
+  (`idun_diff` ist seit v0.1.21 als MCP-Tool live: nimmt `prompt_a`/`prompt_b`/`format`,
+  vergleicht Agent-Trajectories side-by-side. Live verifiziert 2026-08-03 via stdio:
+  2 echte Prompts → Steps A:20/B:9, Shared:0, Unique A:7/B:3.)
 
 ## Release-Historie (2026-08-02/03, live verifiziert)
 
