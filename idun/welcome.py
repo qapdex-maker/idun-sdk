@@ -78,11 +78,29 @@ def _run_cmatrix() -> None:
         pass
 
 
+def _reset_screen() -> None:
+    """Return to the main screen and clear it, regardless of cmatrix exit path.
+
+    `cmatrix -s` switches to the terminal's alternate screen buffer. When it is
+    killed by our timeout (SIGTERM) instead of exiting on a key press, it may
+    NOT emit the "leave alternate screen" escape, so the frozen matrix frame
+    stays on the visible screen and would overwrite the banner printed next.
+    Forcing the reset here makes the welcome robust to both exit paths.
+    """
+    try:
+        # 1049l: leave alt screen | 2J: clear | H: home cursor | 0m: reset color
+        sys.stdout.write("\033[?1049l\033[2J\033[H\033[0m")
+        sys.stdout.flush()
+    except Exception:
+        pass
+
+
 def show_welcome(force_cmatrix: bool = False) -> None:
     """Print the Idun banner, optionally preceded by the matrix flourish."""
     interactive = sys.stdout.isatty()
     if interactive or force_cmatrix:
         _run_cmatrix()
+        _reset_screen()  # clean slate whether cmatrix exited cleanly or was killed
     sys.stdout.write(_BANNER)
     sys.stdout.write("\n")
     sys.stdout.flush()
