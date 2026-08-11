@@ -171,6 +171,25 @@ Offen (unblockiert, optional):
 - **v0.1.25** — `run_pack` Resilienz (per-Prompt-Fehler isoliert).
 - **v0.1.26** — CR-Fixes (fp-None guard im retry, narrow token-inspect except). *Shadow-Release, nicht auf main gemergt.*
 - **v0.1.27** — Sync: main == PyPI (holt 0.1.26 CR-Fixes rein, Version-Konsistenz).
-- **v0.1.29** — CLI `--help` Examples für alle 10 Subcommands (argparse description). **Aktueller Stand.**
-- PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live.
+- **v0.1.30** — `welcome.py` Fix: cmatrix-Flourish läuft nicht unter pytest/CI
+  (stdout kein TTY → `_run_cmatrix()` bails early statt 5s-Hang). `idun welcome`
+  erzwingt Matrix nur noch auf echtem TTY. `test_welcome.py` (3 Tests) grün.
+  **Aktueller Stand.**
+- PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live (inkl. 0.1.30).
+
+## v0.1.31 — Test-Suite-Härtung (WIP, lokal)
+- **Root-Cause (gefunden via echten pytest-Run):** Die "offline" Tests sind
+  NICHT hermetisch — `complete()`/`complete_async()` rufen `maybe_refresh()`,
+  das bei einem vorhandenen aber abgelaufenen `~/.foundry_token.txt` (ohne
+  `refresh_token`) in den interaktiven `login()` fällt und pytest **unendlich**
+  blockiert. CI lief nur deshalb grün, weil dort KEINE Token-Datei existiert.
+- **Fix:** `tests/conftest.py` mit autouse-Fixture stubbt `idun.auth.maybe_refresh`
+  → `None`, damit kein Test live auth erreichen kann (unabhängig von Token-Datei).
+- **Fix:** `welcome.py` — `_run_cmatrix()` bzw. `idun welcome` starten die
+  cmatrix-Flourish nur noch bei echtem TTY (`sys.stdout.isatty()`); unter
+  pytest/CI kein 5s-Hang mehr.
+- **Verifiziert:** `sh run_tests.sh` → **25 passed in 4.11s**, kein Hang, keine
+  cmatrix-Ausgabe. (vorher: Timeout nach 180s wegen device-code Poll-Loop.)
+- Offen: commit + tag `v0.1.31` + `twine upload` (PyPI). README/long_description
+  unverändert (nur Test-Infra + welcome-Guard).
 - CI: grün auf py3.8–3.12 (PR #4 gemergt, `4af7d02`).

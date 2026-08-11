@@ -66,6 +66,11 @@ def _run_cmatrix() -> None:
     """Best-effort short matrix flourish. Never raises."""
     if not _cmatrix_available():
         return
+    # Only animate on a real terminal. Under pytest / CI, stdout is a redirect
+    # (not a tty), so cmatrix could not exit on a keypress and would run the
+    # full timeout, hanging the test suite. Bail early in that case.
+    if not sys.stdout.isatty():
+        return
     # -s screensaver mode (exits on first keystroke); -u delay; -C colour.
     cmd = ["cmatrix", "-s", "-u", "4", "-C", _CMATRIX_COLOR]
     try:
@@ -115,4 +120,6 @@ def maybe_welcome() -> None:
 
 
 if __name__ == "__main__":
-    show_welcome(force_cmatrix=True)
+    # Only force the matrix flourish on a real terminal; otherwise it would
+    # hang (no keypress can interrupt it when stdout is not a tty).
+    show_welcome(force_cmatrix=sys.stdout.isatty())
