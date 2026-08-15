@@ -12,17 +12,28 @@
 
 **Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — with a pluggable multi-backend layer.**
 
-No `httpx`, no `azure-identity`, no Flask — it runs headless on Termux/Android with
-nothing but the Python standard library. Idun is a **tool agent** (it reasons and
+Runs headless on Termux/Android with nothing but the Python standard library
+(no `httpx`, no `azure-identity`, no Flask). Idun is a **tool agent** (reasons +
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
-(reasoning steps + tool calls) instead of a black-box answer.
+(reasoning + tool calls) instead of a black-box answer.
 
-**Multi-backend (v0.1.31+):** the same `IdunClient` API dispatches to
-`azure` (default), `hf` (Hugging Face), `github` (GitHub Models), or `ollama`
-(local). Non-Azure backends need no Foundry token, so Idun keeps working even
-when the Azure subscription is suspended.
+## Multi-backend
 
----
+The same `IdunClient` API dispatches to four interchangeable backends. Non-Azure
+backends need no `FOUNDRY_TOKEN`, so the SDK keeps working even when the Azure
+subscription is suspended.
+
+| Backend  | Credentials                          | Cost     | Notes |
+|----------|--------------------------------------|----------|-------|
+| `azure`  | Entra device-code (`idun login`)     | paid     | default; full tool-agent trajectory |
+| `hf`     | `HF_TOKEN` / `~/hf_token.txt`        | free     | Hugging Face Inference API; flat answer |
+| `github` | `GITHUB_TOKEN` / `~/github_token.txt`| free     | GitHub Models (OpenAI-compatible) |
+| `ollama` | local server at `OLLAMA_BASE`        | free     | no cloud; set `OLLAMA_MODEL` |
+
+Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).
+Model overrides: `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`, `OLLAMA_MODEL`.
+Non-Azure backends return a flat answer (`res.steps == []`) — the tool-agent
+trajectory is an Azure-Idun feature.
 
 ## Install
 
@@ -31,42 +42,101 @@ pip install idun-sdk
 ```
 
 Installs the `idun` CLI, the `idun` Python package, and the stdlib MCP server
-`idun_mcp.py`.
+`idun_mcp.py`. Requires Python ≥ 3.8; **no third-party dependencies**
+(stdlib-only, runs headless on Termux/Android).
 
-## Authenticate
+Verify the install:
 
 ```bash
-idun login          # device-code flow, token saved to ~/foundry_token.txt
+idun --help          # shows all commands
+idun welcome         # banner + matrix intro
 ```
 
-**No admin role required** — `idun login` returns a plain Entra bearer token for
-the Foundry endpoint. Any tenant user with agent access (RBAC) can run it; admin
-rights are only needed to *configure* the agent, not to *use* it. The token
-auto-rotates before expiry.
+## Setup
+
+Idun is backend-agnostic. Pick a backend once with the wizard (writes
+`~/.idunrc`, sourced automatically by your shell), or set credentials per
+backend. Run the wizard for a guided, universal first-run setup:
+
+```bash
+idun wizard          # choose backend, capture creds/config -> ~/.idunrc
+source ~/.idunrc     # or restart your shell
+idun status          # confirm active backend + credential state
+```
+
+### Backend credentials
+
+| Backend  | Setup command                              | Stored at / env            |
+|----------|--------------------------------------------|----------------------------|
+| `azure`  | `idun login`                               | `~/foundry_token.txt`      |
+| `hf`     | `idun login --backend hf`                  | `~/hf_token.txt` / `HF_TOKEN` |
+| `github` | `idun login --backend github`              | `~/github_token.txt` / `GITHUB_TOKEN` |
+| `ollama` | start a local server, set `OLLAMA_BASE`    | env `OLLAMA_BASE` / `OLLAMA_MODEL` |
+
+**Azure (default).** `idun login` runs a device-code flow and stores an Entra
+bearer token. **No admin role required** — any tenant user with agent RBAC can
+run it; admin rights are only needed to *configure* the agent, not to *use* it.
+The token auto-rotates before expiry.
+
+**Hugging Face / GitHub.** The wizard or `idun login --backend <x>` prompts for
+a token and saves it (0600). Both offer a free tier; no Azure subscription or
+card needed.
+
+**Ollama.** Run a local Ollama server (e.g. `ollama serve`) and point Idun at it:
+
+```bash
+export OLLAMA_BASE=http://localhost:11434
+export OLLAMA_MODEL=llama3.1
+```
+
+### Switching backends
+
+Globally via env, or per call via `--backend`:
+
+```bash
+export IDUN_BACKEND=hf          # all future calls use HF
+idun chat --backend github "Hi" # one-off override
+```
+
+Model overrides (optional): `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`,
+`OLLAMA_MODEL`.
+
+### Quick test
+
+```bash
+idun chat "Hello"                       # azure (needs login first)
+idun chat --backend hf "Hello"          # any backend with creds set
+```
 
 ## Quickstart
 
 ```bash
-# final answer only
-idun chat "Summarize Contoso's sustainability communications in one sentence."
-
-# full agent trajectory (reasoning + tool steps)
-idun trace "Use web_search to find the current CEO of Contoso."
+idun chat "Summarize Contoso's sustainability comms in one sentence."
+idun trace --backend azure "Use web_search to find the current CEO of Contoso."
 ```
 
 ```python
 from idun import IdunClient
 
+# Azure (default)
 res = IdunClient().complete("Your prompt here")
 print(res.text)                 # final answer
 for s in res.steps:             # agent trajectory
     print(s.kind, s.tool, s.query, s.status)
+
+# Hugging Face (no Azure token needed)
+res = IdunClient(backend="hf", hf_token="hf_xxx",
+                 hf_model="microsoft/phi-3-mini-4k-instruct").complete("Hello")
+print(res.text)
 ```
 
-## Features
+## Commands
 
 | Command | Purpose |
 |---------|---------|
+| `idun wizard` | universal first-run setup |
+| `idun login [--backend X]` | store backend credentials |
+| `idun status` | show active backend + credential state |
 | `idun chat` | final answer only |
 | `idun trace` | full trajectory (steps + text) |
 | `idun export` | trajectory as JSON / Markdown |
@@ -74,44 +144,6 @@ for s in res.steps:             # agent trajectory
 | `idun diff` | side-by-side trace diff of two prompts |
 | `idun token` | inspect / refresh the Foundry token |
 | `idun logo` | print the Foundry logo |
-
-## Multi-backend (no Foundry dependency)
-
-Idun runs on four interchangeable backends behind the **same** `IdunClient`
-API. Non-Azure backends need no `FOUNDRY_TOKEN`, so the SDK keeps working even
-when the Azure subscription is suspended.
-
-```bash
-idun wizard                 # universal first-run setup -> writes ~/.idunrc
-idun status                 # show active backend + credential state
-idun login --backend hf     # store a Hugging Face token
-idun chat --backend github "Hello"   # one-shot backend override
-```
-
-| Backend  | Credentials                         | Cost     | Notes |
-|----------|-------------------------------------|----------|-------|
-| `azure`  | Entra device-code (`idun login`)    | paid     | default; full tool-agent trajectory |
-| `hf`     | `HF_TOKEN` / `~/hf_token.txt`       | free tier| serverless Inference API; flat answer |
-| `github` | `GITHUB_TOKEN` / `~/github_token.txt` | free tier | GitHub Models (OpenAI-compatible) |
-| `ollama` | local server at `OLLAMA_BASE`      | free     | no cloud; set `OLLAMA_MODEL` |
-
-Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).
-Per-backend model overrides: `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`,
-`OLLAMA_MODEL`.
-
-```python
-from idun import IdunClient
-
-# Hugging Face (no Azure token needed)
-res = IdunClient(backend="hf", hf_token="hf_xxx", hf_model="microsoft/phi-3-mini-4k-instruct")
-print(res.complete("Hello").text)
-
-# GitHub Models (free)
-res = IdunClient(backend="github", github_token="ghp_xxx").complete("Hi")
-```
-
-Note: non-Azure backends return a flat answer (`res.steps == []`) — the
-tool-agent trajectory (reasoning + `web_search`) is an Azure-Idun feature.
 
 ## MCP server
 
@@ -132,32 +164,17 @@ Docs mirror (GitMCP): `https://gitmcp.io/qapdex-maker/idun-sdk/sse`
 ## Combine with Sentry (MCP)
 
 Idun pairs well with [Sentry's MCP server](https://github.com/getsentry/sentry-mcp)
-so an agent can both *call* Idun and *inspect* Sentry errors/traces. Sentry
-MCP is a separate, optional provider — the Idun SDK stays stdlib-only.
-
-Remote (zero-setup, OAuth — **note the `/mcp` suffix**):
+so an agent can both *call* Idun and *inspect* Sentry errors. Add it remotely
+(OAuth, note the `/mcp` suffix):
 
 ```json
 { "mcpServers": { "sentry": { "url": "https://mcp.sentry.dev/mcp" } } }
 ```
 
-Stdio (OAuth via `mcp-remote`, no static token needed):
+Recommended combo: `idun` (calls the agent) + `idun-docs` (reads SDK docs) +
+`sentry` (queries error tracking).
 
-```json
-{ "mcpServers": { "sentry": { "command": "npx", "args": ["-y", "mcp-remote@latest", "https://mcp.sentry.dev/mcp"] } } }
-```
-
-Authenticate once (opens a browser for the OAuth flow):
-
-```
-/mcp auth sentry
-```
-
-Recommended combo for a foreign agent: `idun` (calls the agent) + `idun-docs`
-(reads the SDK docs) + `sentry` (queries error tracking). The agent can invoke
-Idun and, when a call fails, pull the correlated Sentry issue on its own.
-
-## Request shape (verified)
+## Azure request shape (verified)
 
 ```
 POST {base}/api/projects/{project}/agents/{agent}/endpoint/protocols/openai/responses?api-version=2025-05-15-preview
