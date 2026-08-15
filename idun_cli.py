@@ -142,6 +142,65 @@ def cmd_status(_args):
         print(f"  ollama model : {os.environ.get('OLLAMA_MODEL') or be.OLLAMA_DEFAULT_MODEL}")
 
 
+def cmd_hf(args):
+    """Hugging Face pipeline: whoami / status / push (stdlib-only)."""
+    from idun import hf_pipeline as hf
+    token = hf.load_hf_token()
+    sub = args.hf_command
+    if sub == "whoami":
+        if not token:
+            print("HF token missing. Set HF_TOKEN or ~/hf_token.txt "
+                  "(idun login --backend hf).")
+            return 1
+        try:
+            info = hf.hf_whoami(token)
+        except RuntimeError as e:
+            print(f"HF whoami failed: {e}")
+            return 1
+        print(f"HF user : {info.get('name')}  (id {info.get('id')})")
+        orgs = [o.get('name') for o in info.get('orgs', [])]
+        if orgs:
+            print(f"orgs    : {', '.join(orgs)}")
+        print(f"email   : {info.get('email') or '(private)'}")
+        return 0
+    if sub == "status":
+        model = args.model
+        st = hf.hf_model_status(model, token)
+        if st["error"]:
+            print(f"{model}: error -> {st['error']}")
+            return 1
+        if not st["exists"]:
+            print(f"{model}: NOT FOUND on the Hub")
+            return 1
+        gated = st["gated"] or "no"
+        print(f"{model}: exists | gated={gated} | private={st['private']} | "
+              f"task={st['pipeline_tag'] or 'n/a'}")
+        return 0
+    if sub == "push":
+        if not token:
+            print("HF token missing. Set HF_TOKEN or ~/hf_token.txt.")
+            return 1
+        model = args.model
+        files = {}
+        for f in args.files:
+            try:
+                with open(f, encoding="utf-8") as fh:
+                    files[os.path.basename(f)] = fh.read()
+            except OSError as e:
+                print(f"cannot read {f}: {e}")
+                return 1
+        try:
+            commit = hf.hf_upload(model, files, token, private=args.private)
+        except RuntimeError as e:
+            print(f"HF push failed: {e}")
+            return 1
+        print(f"pushed {len(files)} file(s) to {model}")
+        print(f"commit: {commit.get('commitId', 'n/a')}")
+        return 0
+    print("unknown hf subcommand")
+    return 1
+
+
 def cmd_wizard(_args):
     """Universal first-run setup: picks a backend, captures creds/config,
     writes ~/.idunrc so every future `idun` call uses it globally."""
@@ -391,6 +450,26 @@ def build_parser() -> argparse.ArgumentParser:
                     help="diff output format (json or human-readable md)")
     _add_common_args(pd)
     pd.set_defaults(func=cmd_diff)
+
+    ph = sub.add_parser(
+        "hf",
+        help="Hugging Face pipeline: whoami / model status / push to Hub",
+        description=("Hugging Face Hub + Inference glue (stdlib-only, no huggingface_hub "
+                     "client needed).\n\n"
+                     "  idun hf whoami              # validate token, show user\n"
+                     "  idun hf status MODEL       # exists? gated? private? task?\n"
+                     "  idun hf push MODEL f1 f2   # create repo + upload files"),
+    )
+    hfsub = ph.add_subparsers(dest="hf_command", required=True)
+    hfsub.add_parser("whoami", help="show HF user for the current token")
+    pstat = hfsub.add_parser("status", help="probe a model repo on the Hub")
+    pstat.add_argument("model", help="e.g. microsoft/phi-3-mini-4k-instruct")
+    ppush = hfsub.add_parser("push", help="create a repo and upload files")
+    ppush.add_argument("model", help="target repo, e.g. qapdex/my-agent-out")
+    ppush.add_argument("files", nargs="+", help="local files to upload")
+    ppush.add_argument("--private", action="store_true", help="create a private repo")
+    ph.set_defaults(func=cmd_hf)
+
     return p
 
 

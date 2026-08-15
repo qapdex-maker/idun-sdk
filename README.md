@@ -145,6 +145,21 @@ print(res.text)
 | `idun token` | inspect / refresh the Foundry token |
 | `idun logo` | print the Foundry logo |
 
+## Hugging Face pipeline
+
+The `hf` command wraps the Hugging Face Hub + Inference API (stdlib-only for
+`whoami` / `status`; `push` uses the optional `huggingface_hub` client):
+
+```bash
+idun hf whoami                              # validate token, show HF user
+idun hf status microsoft/phi-3-mini-4k-instruct   # exists? gated? private? task?
+idun hf push Qapdex/my-agent-out a.txt b.txt       # create repo + upload files
+```
+
+`push` needs `pip install huggingface_hub` (kept optional so the SDK stays
+stdlib-only for everything else). Upload under your **user** namespace
+(`Qapdex/...`), not an org, unless your token has write rights there.
+
 ## MCP server
 
 `idun_mcp.py` is a zero-dependency stdio MCP server (no FastMCP / httpx):
