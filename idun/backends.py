@@ -6,7 +6,6 @@ code (CLI, MCP, Conversation) never changes:
   IDUN_BACKEND=azure     -> Azure AI Foundry (default, unchanged behaviour)
   IDUN_BACKEND=hf        -> Hugging Face Inference API (Bearer HF_TOKEN)
   IDUN_BACKEND=github    -> GitHub Models (Bearer GITHUB_TOKEN, free tier)
-  IDUN_BACKEND=ollama    -> local Ollama server (no auth, no cost)
 
 Every backend returns a plain (text, model_name) tuple which the client
 wraps into an IdunResult (with an empty step list, since these backends do
@@ -161,37 +160,7 @@ def complete_github(prompt: str, token: str, model: str, timeout: int = 120,
     return text, model
 
 
-# --------------------------------------------------------------------------
-# Ollama (local, free)
-# --------------------------------------------------------------------------
-
-OLLAMA_DEFAULT_BASE = "http://localhost:11434"
-OLLAMA_DEFAULT_MODEL = "llama3.1"
-
-
-def complete_ollama(prompt: str, base: str, model: str, timeout: int = 300) -> tuple[str, str]:
-    """Run a prompt through a local Ollama /api/generate endpoint."""
-    url = f"{base.rstrip('/')}/api/generate"
-    body = {"model": model, "prompt": prompt, "stream": False}
-    headers = {"Content-Type": "application/json"}
-    req = urllib.request.Request(
-        url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        msg = e.read().decode("utf-8", "replace")[:400]
-        raise RuntimeError(f"Ollama HTTP {e.code}: {msg}") from e
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Ollama unreachable at {base}: {e.reason}") from e
-    return data.get("response", ""), model
-
-
-# --------------------------------------------------------------------------
-# Dispatch
-# --------------------------------------------------------------------------
-
-VALID_BACKENDS = ("azure", "hf", "github", "ollama")
+VALID_BACKENDS = ("azure", "hf", "github")
 
 
 def backend_from_env() -> str:
@@ -216,8 +185,7 @@ def _extract_last_user(messages: list) -> str:
 
 def run_external(backend: str, prompt: str, *, hf_token: str = "",
                  hf_model: str = HF_DEFAULT_MODEL, github_token: str = "",
-                 github_model: str = GITHUB_DEFAULT_MODEL, ollama_base: str = OLLAMA_DEFAULT_BASE,
-                 ollama_model: str = OLLAMA_DEFAULT_MODEL, timeout: int = 300,
+                 github_model: str = GITHUB_DEFAULT_MODEL, timeout: int = 300,
                  max_tokens: int = 1024) -> tuple[str, str]:
     """Dispatch a single prompt to the chosen non-azure backend.
 
@@ -231,6 +199,4 @@ def run_external(backend: str, prompt: str, *, hf_token: str = "",
             raise RuntimeError("GitHub backend needs GITHUB_TOKEN (env or ~/github_token.txt).")
         return complete_github(prompt, github_token, github_model,
                                timeout=timeout, max_tokens=max_tokens)
-    if backend == "ollama":
-        return complete_ollama(prompt, ollama_base, ollama_model, timeout=timeout)
     raise ValueError(f"unknown backend: {backend!r}")

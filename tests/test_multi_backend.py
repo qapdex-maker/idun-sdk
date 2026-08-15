@@ -26,16 +26,16 @@ def test_invalid_backend_rejected():
         IdunClient(backend="nope")
 
 
+def test_valid_backends_are_azure_hf_github():
+    assert be.VALID_BACKENDS == ("azure", "hf", "github")
+
+
 def test_env_overrides_for_models(monkeypatch):
     monkeypatch.setenv("HF_MODEL", "microsoft/phi-2")
     monkeypatch.setenv("GITHUB_MODEL", "gpt-4o")
-    monkeypatch.setenv("OLLAMA_BASE", "http://example:11434")
-    monkeypatch.setenv("OLLAMA_MODEL", "mistral")
     c = IdunClient(backend="hf")
     assert c.hf_model == "microsoft/phi-2"
     assert c.github_model == "gpt-4o"
-    assert c.ollama_base == "http://example:11434"
-    assert c.ollama_model == "mistral"
 
 
 def test_run_external_hf_shape(monkeypatch):
@@ -53,21 +53,17 @@ def test_run_external_hf_shape(monkeypatch):
     assert captured["model"] == "microsoft/phi-2"
 
 
-def test_run_external_ollama_shape(monkeypatch):
-    def fake(prompt, base, model, timeout=300):
-        return f"ollama:{prompt}", model
-
-    monkeypatch.setattr(be, "complete_ollama", fake)
-    text, model = be.run_external("ollama", "hi", ollama_base="http://x:11434", ollama_model="llama3.1")
-    assert text == "ollama:hi"
-    assert model == "llama3.1"
-
-
 def test_run_external_github_requires_token():
     import pytest
     with pytest.raises(RuntimeError):
         # no token -> should refuse before any network call
         be.run_external("github", "hi", github_token="")
+
+
+def test_run_external_unknown_backend():
+    import pytest
+    with pytest.raises(ValueError):
+        be.run_external("ollama", "hi")
 
 
 def test_complete_hf_returns_idunresult(monkeypatch):

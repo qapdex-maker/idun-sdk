@@ -4,7 +4,7 @@
 > Stdlib-only (urllib, no httpx/azure.identity) for Termux/Android.
 > Idun is a tool agent: it reasons and calls web_search / memory_search.
 > Multi-backend (v0.1.31+): same IdunClient API dispatches to
-> azure (default), hf (Hugging Face), github (GitHub Models), ollama (local).
+> azure (default), hf (Hugging Face), github (GitHub Models).
 > Non-Azure backends need no FOUNDRY_TOKEN.
 
 ## Documentation
@@ -25,15 +25,13 @@
 - azure:   `idun login`                 -> `~/foundry_token.txt` (device-code, no admin role)
 - hf:      `idun login --backend hf`    -> `~/hf_token.txt` / `HF_TOKEN`
 - github:  `idun login --backend github`-> `~/github_token.txt` / `GITHUB_TOKEN`
-- ollama:  set `OLLAMA_BASE` + `OLLAMA_MODEL` (local server)
 - switch:  `export IDUN_BACKEND=hf` (global) or `idun chat --backend github "..."` (one-off)
-- config override envs: `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`, `OLLAMA_MODEL`
+- config override envs: `HF_MODEL`, `GITHUB_MODEL`
 
 ## Key API
 
 - `IdunClient(token=None, backend="azure", base=..., project=..., agent=...,
-  hf_token=..., hf_model=..., github_token=..., github_model=...,
-  ollama_base=..., ollama_model=..., timeout=600)` — reads `FOUNDRY_TOKEN` /
+  hf_token=..., hf_model=..., github_token=..., github_model=..., timeout=600)` — reads `FOUNDRY_TOKEN` /
   `IDUN_BACKEND` / per-backend tokens from env or args.
 - `client.complete(prompt, max_output_tokens=1024) -> IdunResult` — returns
   `text` (final answer) + `steps` (agent trajectory: kind=reasoning|tool).

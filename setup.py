@@ -41,10 +41,24 @@ readme_path = os.path.join(this_dir, "README.md")
 with open(readme_path, encoding="utf-8") as f:
     LONG_DESCRIPTION = f.read()
 
+# Single source of truth: read __version__ from idun/__init__.py (no import
+# side effects). This prevents the historical drift where setup.py was bumped
+# per release but idun/__init__.py stayed pinned at 0.1.31, so every published
+# wheel misreported its own version.
+def _read_version():
+    init_path = os.path.join(this_dir, "idun", "__init__.py")
+    with open(init_path, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("__version__"):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    raise RuntimeError("Cannot find __version__ in idun/__init__.py")
+
+VERSION = _read_version()
+
 setup(
     name="idun-sdk",
-    version="0.1.36",
-    description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE (multi-backend: azure/hf/github/ollama)",
+    version=VERSION,
+    description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE (multi-backend: azure/hf/github)",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     author="Idun",
