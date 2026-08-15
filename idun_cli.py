@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Idun CLI — terminal client for NatureLM-Idun-5-MoE on Azure AI Foundry.
+"""Idun CLI — terminal client for NatureLM-Idun-5-MoE (multi-backend).
 
 Usage:
-  idun login                 # device-code Entra login -> ~/foundry_token.txt
-  idun chat  "your prompt"   # print final answer
-  idun trace "your prompt"   # print agent trajectory (reasoning + web_search steps)
-  idun token [--status|--refresh|-f]   # inspect / rotate the stored token
+  idun wizard                 # universal first-run setup (any user, any backend)
+  idun login  --backend hf    # store backend credentials
+  idun status                 # show active backend + credential state
+  idun chat  --backend github "your prompt"   # print final answer
+  idun trace "your prompt"    # print agent trajectory (azure only, with steps)
+  idun token [--status|--refresh|-f]   # inspect / rotate the stored Azure token
 
-Stdlib-only; needs FOUNDRY_TOKEN (from `idun login` or env).
+Stdlib-only; each backend has its own credential file (no single secret).
 """
 from __future__ import annotations
 
@@ -20,6 +22,7 @@ from idun import IdunClient, login as do_login, load_token, logo_path
 from idun.client import IdunResult
 from idun.auth import maybe_refresh, _load_meta, REFRESH_SLACK
 from idun.welcome import maybe_welcome, show_welcome
+from idun import backends
 
 BANNER = r"""
  ___    ___  _  _  _   _  _ _  _  _  _  ___  ___  ___
@@ -30,25 +33,58 @@ BANNER = r"""
 """
 
 
-def _client() -> IdunClient:
-    tok = load_token() or os.environ.get("FOUNDRY_TOKEN")
-    if not tok:
-        sys.exit("No token. Run `idun login` first (or export FOUNDRY_TOKEN).")
-    return IdunClient(token=tok)
+def _add_backend_arg(p):
+    p.add_argument("--backend", choices=["azure", "hf", "github", "ollama"],
+                   default="azure", help="completion backend (default: azure)")
+
+
+def _add_common_args(p):
+    _add_backend_arg(p)
+    p.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
+    p.add_argument("--async", action="store_true", dest="async_",
+                   help="use the asyncio variant (no extra deps)")
+
+
+def _client(backend: str = "azure") -> IdunClient:
+    if backend == "azure":
+        tok = load_token() or os.environ.get("FOUNDRY_TOKEN")
+        if not tok:
+            sys.exit("No token. Run `idun login` first (or export FOUNDRY_TOKEN).")
+        return IdunClient(token=tok, backend="azure")
+    # external backends: no FOUNDRY_TOKEN required
+    return IdunClient(backend=backend)
 
 
 def _run(args, prompt) -> IdunResult:
     """Sync or async completion based on args.async flag (default sync)."""
-    c = _client()
+    c = _client(getattr(args, "backend", "azure"))
     if getattr(args, "async_", False):
         import asyncio
         return asyncio.run(c.complete_async(prompt, max_output_tokens=args.max_tokens))
     return c.complete(prompt, max_output_tokens=args.max_tokens)
 
 
-def cmd_login(_args):
+def cmd_login(args):
     print(BANNER)
-    do_login()
+    backend = getattr(args, "backend", "azure")
+    if backend == "azure":
+        do_login()
+        return
+    if backend == "hf":
+        tok = input("Hugging Face token (hf_...): ").strip()
+        if tok:
+            from idun.backends import save_hf_token
+            save_hf_token(tok)
+            print("saved -> ~/hf_token.txt")
+        return
+    if backend == "github":
+        tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
+        if tok:
+            from idun.backends import save_github_token
+            save_github_token(tok)
+            print("saved -> ~/github_token.txt")
+        return
+    sys.exit(f"login not supported for backend {backend!r}")
 
 
 def cmd_chat(args):
@@ -83,6 +119,91 @@ def cmd_logo(_args):
 
 def cmd_welcome(_args):
     show_welcome(force_cmatrix=True)
+
+
+def cmd_status(_args):
+    from idun import backends as be
+    backend = os.environ.get("IDUN_BACKEND", "azure")
+    print(f"active backend : {backend}")
+    if backend == "azure":
+        meta = _load_meta()
+        ok = bool(meta and meta.get("access_token"))
+        print(f"  azure token  : {'present' if ok else 'MISSING (~/foundry_token.txt)'}")
+    elif backend == "hf":
+        tok = be.load_hf_token()
+        print(f"  hf token     : {'present' if tok else 'MISSING'}")
+        print(f"  hf model     : {os.environ.get('HF_MODEL') or be.HF_DEFAULT_MODEL}")
+    elif backend == "github":
+        tok = be.load_github_token()
+        print(f"  github token : {'present' if tok else 'MISSING'}")
+        print(f"  gh model     : {os.environ.get('GITHUB_MODEL') or be.GITHUB_DEFAULT_MODEL}")
+    elif backend == "ollama":
+        print(f"  ollama base  : {os.environ.get('OLLAMA_BASE') or be.OLLAMA_DEFAULT_BASE}")
+        print(f"  ollama model : {os.environ.get('OLLAMA_MODEL') or be.OLLAMA_DEFAULT_MODEL}")
+
+
+def cmd_wizard(_args):
+    """Universal first-run setup: picks a backend, captures creds/config,
+    writes ~/.idunrc so every future `idun` call uses it globally."""
+    print(BANNER)
+    print("Idun Setup Wizard — configure a backend (runs for any user).")
+    print("-" * 60)
+    print("Available backends:")
+    print("  1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.")
+    print("  2) hf      — Hugging Face Inference API (free tier, needs HF token).")
+    print("  3) github  — GitHub Models (free tier, needs GitHub PAT).")
+    print("  4) ollama  — local Ollama server (free, no cloud).")
+    choice = input("Select backend [1-4]: ").strip()
+    mapping = {"1": "azure", "2": "hf", "3": "github", "4": "ollama"}
+    backend = mapping.get(choice, "azure")
+    print(f"Selected: {backend}\n")
+
+    cfg = {}
+    if backend == "azure":
+        print("Azure setup requires a tenant + Foundry resource.")
+        print("Run `idun login --backend azure` and complete the device-code flow.")
+        print("Then (optional) set env to point at your resource:")
+        print("  export IDUN_BASE=https://<resource>.services.ai.azure.com")
+        print("  export IDUN_PROJECT=<project>   IDUN_AGENT=<agent>")
+        cfg["IDUN_BACKEND"] = "azure"
+    elif backend == "hf":
+        tok = input("Hugging Face token (hf_...) [or blank for anonymous]: ").strip()
+        if tok:
+            from idun.backends import save_hf_token
+            save_hf_token(tok)
+        model = input(f"HF model [default: {backends.HF_DEFAULT_MODEL}]: ").strip()
+        if model:
+            cfg["HF_MODEL"] = model
+        cfg["IDUN_BACKEND"] = "hf"
+    elif backend == "github":
+        tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
+        if not tok:
+            sys.exit("GitHub backend requires a PAT. Aborting.")
+        from idun.backends import save_github_token
+        save_github_token(tok)
+        model = input(f"GitHub model [default: {backends.GITHUB_DEFAULT_MODEL}]: ").strip()
+        if model:
+            cfg["GITHUB_MODEL"] = model
+        cfg["IDUN_BACKEND"] = "github"
+    elif backend == "ollama":
+        base = input(f"Ollama base URL [default: {backends.OLLAMA_DEFAULT_BASE}]: ").strip()
+        if base:
+            cfg["OLLAMA_BASE"] = base
+        model = input(f"Ollama model [default: {backends.OLLAMA_DEFAULT_MODEL}]: ").strip()
+        if model:
+            cfg["OLLAMA_MODEL"] = model
+        cfg["IDUN_BACKEND"] = "ollama"
+
+    # write ~/.idunrc (shell env file)
+    rc = os.path.join(os.path.expanduser("~"), ".idunrc")
+    with open(rc, "a", encoding="utf-8") as f:
+        f.write("\n# idun wizard config\n")
+        for k, v in cfg.items():
+            f.write(f"export {k}={v}\n")
+    os.chmod(rc, 0o600)
+    print(f"\nWrote config to {rc}")
+    print("Source it once:  source ~/.idunrc   (or restart your shell)")
+    print("Then:  idun chat \"Hello\"  (uses the configured backend)")
 
 
 def cmd_token(args):
@@ -159,14 +280,19 @@ def cmd_diff(args):
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI")
+    p = argparse.ArgumentParser(prog="idun", description="NatureLM-Idun-5-MoE CLI (multi-backend)")
     sub = p.add_subparsers(dest="command", required=True)
 
-    sub.add_parser(
+    pl = sub.add_parser(
         "login",
-        help="device-code Entra login",
-        description="Authenticate against Entra and store the token in ~/foundry_token.txt.\n\nExample:\n  idun login",
-    ).set_defaults(func=cmd_login)
+        help="store backend credentials",
+        description=("Store credentials for a backend.\n\n"
+                     "  idun login --backend azure    (device-code Entra login)\n"
+                     "  idun login --backend hf       (Hugging Face token)\n"
+                     "  idun login --backend github   (GitHub PAT)"),
+    )
+    _add_backend_arg(pl)
+    pl.set_defaults(func=cmd_login)
 
     sub.add_parser(
         "logo",
@@ -180,26 +306,36 @@ def build_parser() -> argparse.ArgumentParser:
         description="Render the Idun welcome screen (banner + matrix rain).\n\nExample:\n  idun welcome",
     ).set_defaults(func=cmd_welcome)
 
+    pw = sub.add_parser(
+        "wizard",
+        help="universal first-run setup for any user",
+        description="Interactive setup wizard: picks a backend, captures creds/config, writes ~/.idunrc so every future `idun` call uses it globally.\n\nExample:\n  idun wizard",
+    )
+    pw.set_defaults(func=cmd_wizard)
+
+    ps = sub.add_parser(
+        "status",
+        help="show active backend + credential state",
+        description="Print the resolved backend and whether credentials are present (no secret is shown).\n\nExample:\n  idun status",
+    )
+    ps.set_defaults(func=cmd_status)
+
     pc = sub.add_parser(
         "chat",
         help="print final answer",
-        description="Send a prompt and print only the final answer text.\n\nExample:\n  idun chat \"What is the capital of France?\"\n  idun chat --max-tokens 2048 \"Summarize quantum computing\"\n  idun chat --async \"Explain transformers\"",
+        description="Send a prompt and print only the final answer text.\n\nExample:\n  idun chat \"What is the capital of France?\"\n  idun chat --backend github \"Summarize quantum computing\"\n  idun chat --async \"Explain transformers\"",
     )
     pc.add_argument("prompt")
-    pc.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
-    pc.add_argument("--async", action="store_true", dest="async_",
-                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    _add_common_args(pc)
     pc.set_defaults(func=cmd_chat)
 
     pt = sub.add_parser(
         "trace",
         help="print agent trajectory (steps)",
-        description="Send a prompt and print the full agent trajectory (reasoning + web_search steps).\n\nExample:\n  idun trace \"What is the capital of France?\"\n  idun trace --max-tokens 1024 \"Compare Python and Rust\"",
+        description="Send a prompt and print the full agent trajectory (reasoning + web_search steps). Only meaningful on the azure backend.\n\nExample:\n  idun trace \"What is the capital of France?\"\n  idun trace --backend azure \"Compare Python and Rust\"",
     )
     pt.add_argument("prompt")
-    pt.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
-    pt.add_argument("--async", action="store_true", dest="async_",
-                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    _add_common_args(pt)
     pt.set_defaults(func=cmd_trace)
 
     ptok = sub.add_parser(
@@ -215,15 +351,13 @@ def build_parser() -> argparse.ArgumentParser:
     pe = sub.add_parser(
         "export",
         help="run prompt and save agent trajectory",
-        description="Run a prompt and export the full agent trajectory to JSON or markdown.\n\nExample:\n  idun export \"What is the capital of France?\" -o trace.md\n  idun export --format json \"Explain photosynthesis\" -o trace.json\n  idun export --async \"Tell me a joke\" > out.md",
+        description="Run a prompt and export the full agent trajectory to JSON or markdown.\n\nExample:\n  idun export \"What is the capital of France?\" -o trace.md\n  idun export --backend github \"Explain photosynthesis\" -o trace.json\n  idun export --async \"Tell me a joke\" > out.md",
     )
     pe.add_argument("prompt")
     pe.add_argument("--format", choices=["json", "md"], default="json", dest="fmt",
                     help="json (full trajectory) or md (human-readable trace doc)")
     pe.add_argument("--output", "-o", help="write to file instead of stdout")
-    pe.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
-    pe.add_argument("--async", action="store_true", dest="async_",
-                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    _add_common_args(pe)
     pe.set_defaults(func=cmd_export)
 
     pk = sub.add_parser(
@@ -243,9 +377,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="prompt key inside the pack (omit with --all to run every prompt)")
     pr.add_argument("--all", action="store_true", dest="all",
                     help="run ALL prompts in the pack (batch)")
-    pr.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
-    pr.add_argument("--async", action="store_true", dest="async_",
-                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    _add_common_args(pr)
     pr.set_defaults(func=cmd_run)
 
     pd = sub.add_parser(
@@ -257,9 +389,7 @@ def build_parser() -> argparse.ArgumentParser:
     pd.add_argument("prompt_b", metavar="PROMPT_B")
     pd.add_argument("--format", choices=["json", "md"], default="md", dest="fmt",
                     help="diff output format (json or human-readable md)")
-    pd.add_argument("--max-tokens", type=int, default=4096, dest="max_tokens")
-    pd.add_argument("--async", action="store_true", dest="async_",
-                    help="use the asyncio variant (run_in_executor, no extra deps)")
+    _add_common_args(pd)
     pd.set_defaults(func=cmd_diff)
     return p
 

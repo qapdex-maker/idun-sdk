@@ -17,6 +17,8 @@ import asyncio
 import json
 import os
 import time
+
+from . import backends as _be
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -170,7 +172,28 @@ class IdunClient:
         agent: str = FOUNDRY_AGENT_DEFAULT,
         api_version: str = FOUNDRY_API_VERSION_DEFAULT,
         timeout: int = 600,
+        backend: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        hf_model: Optional[str] = None,
+        github_token: Optional[str] = None,
+        github_model: Optional[str] = None,
+        ollama_base: Optional[str] = None,
+        ollama_model: Optional[str] = None,
     ) -> None:
+        # --- backend selection (multi-backend support) ---
+        self.backend = (backend or os.environ.get("IDUN_BACKEND", "azure")).strip().lower()
+        if self.backend not in _be.VALID_BACKENDS:
+            raise ValueError(
+                f"IDUN_BACKEND={self.backend!r} invalid; "
+                f"choose one of {_be.VALID_BACKENDS}")
+        # external-backend credentials/models (env-overridable)
+        self.hf_token = hf_token if hf_token is not None else _be.load_hf_token()
+        self.hf_model = hf_model or os.environ.get("HF_MODEL") or _be.HF_DEFAULT_MODEL
+        self.github_token = github_token if github_token is not None else _be.load_github_token()
+        self.github_model = github_model or os.environ.get("GITHUB_MODEL") or _be.GITHUB_DEFAULT_MODEL
+        self.ollama_base = ollama_base or os.environ.get("OLLAMA_BASE") or _be.OLLAMA_DEFAULT_BASE
+        self.ollama_model = ollama_model or os.environ.get("OLLAMA_MODEL") or _be.OLLAMA_DEFAULT_MODEL
+        # --- azure defaults (unchanged) ---
         self.token = token or os.environ.get("FOUNDRY_TOKEN")
         self.base = base.rstrip("/")
         self.project = project
@@ -242,10 +265,23 @@ class IdunClient:
     def complete(self, prompt: str, max_output_tokens: int = 4096) -> IdunResult:
         """Synchronous completion. Returns final text + agent trajectory.
 
-        Phase 2.5: rotates the Entra token before the call (silent refresh when
-        a refresh_token is stored) and retries once on HTTP 401 (expired token).
-        Transient 5xx / 429 are retried with backoff (see _post_with_retry).
+        Backend dispatch:
+          - azure : Foundry agent (token-managed, retries on 5xx/401).
+          - hf / github / ollama : external backends, no Foundry token needed.
+
+        The non-azure backends return a flat answer (no tool-agent trajectory),
+        so `steps` is empty and `model` is the backend model id.
         """
+        if self.backend != "azure":
+            text, model = _be.run_external(
+                self.backend, prompt,
+                hf_token=self.hf_token, hf_model=self.hf_model,
+                github_token=self.github_token, github_model=self.github_model,
+                ollama_base=self.ollama_base, ollama_model=self.ollama_model,
+                timeout=self.timeout, max_tokens=max_output_tokens,
+            )
+            return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})
+
         from .auth import maybe_refresh  # lazy import keeps install_requires=[]
 
         # ensure a fresh token before the request
@@ -275,10 +311,13 @@ class IdunClient:
     def complete_messages(self, messages: list, max_output_tokens: int = 4096) -> IdunResult:
         """Complete with a structured message list (server-side multi-turn).
 
-        `messages` is a list of {"role": "user"|"assistant", "content": [{"type":
-        "input_text"|"output_text", "text": ...}]}. Verified live: Foundry keeps
-        conversation state from the list (no text-prefix needed).
+        For non-azure backends the message-list is flattened to its last user
+        turn (those backends are single-turn text), preserving the same API.
         """
+        if self.backend != "azure":
+            prompt = _be._extract_last_user(messages)
+            return self.complete(prompt, max_output_tokens)
+
         from .auth import maybe_refresh
         refreshed = maybe_refresh()
         if refreshed:
@@ -331,10 +370,21 @@ class IdunClient:
         """Async variant of complete().
 
         Stdlib-only: the blocking urllib call runs in the default executor so
-        the surrounding asyncio loop stays responsive (no httpx/aiohttp dep).
-        Rotates the token (sync, fast) before the call; transient 5xx/429 use
-        backoff; on 401 it retries once after a forced token rotation.
+        the surrounding asyncio loop stays responsive. Non-azure backends are
+        dispatched through run_external (same as sync complete).
         """
+        if self.backend != "azure":
+            loop = asyncio.get_running_loop()
+            from functools import partial
+            fn = partial(
+                _be.run_external, self.backend, prompt,
+                hf_token=self.hf_token, hf_model=self.hf_model,
+                github_token=self.github_token, github_model=self.github_model,
+                ollama_base=self.ollama_base, ollama_model=self.ollama_model,
+                timeout=self.timeout, max_tokens=max_output_tokens)
+            text, model = await loop.run_in_executor(None, fn)
+            return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})
+
         from .auth import maybe_refresh  # lazy import keeps install_requires=[]
 
         refreshed = maybe_refresh()
