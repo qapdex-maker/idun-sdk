@@ -43,8 +43,8 @@ with open(readme_path, encoding="utf-8") as f:
 
 setup(
     name="idun-sdk",
-    version="0.1.31",
-    description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE",
+    version="0.1.32",
+    description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE (multi-backend: azure/hf/github/ollama)",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     author="Idun",

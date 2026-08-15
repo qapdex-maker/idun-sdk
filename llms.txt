@@ -3,22 +3,29 @@
 > Thin client + CLI for the Azure AI Foundry agent NatureLM-Idun-5-MoE.
 > Stdlib-only (urllib, no httpx/azure.identity) for Termux/Android.
 > Idun is a tool agent: it reasons and calls web_search / memory_search.
+> Multi-backend (v0.1.31+): same IdunClient API dispatches to
+> azure (default), hf (Hugging Face), github (GitHub Models), ollama (local).
+> Non-Azure backends need no FOUNDRY_TOKEN.
 
 ## Documentation
 
-- [README](README.md) — install, auth (Entra device-code), CLI usage
+- [README](README.md) — install, auth (Entra device-code), multi-backend, CLI usage
 - [ROADMAP](ROADMAP.md) — status quo + phases 2-4
 - [MCP server](idun_mcp.py) — stdlib-only stdio MCP server (idun_chat, idun_trace)
 
 ## Key API
 
-- `IdunClient(token=None, base=..., project=..., agent=..., timeout=600)` — reads
-  `FOUNDRY_TOKEN` from env or arg.
-- `client.complete(prompt, max_output_tokens=4096) -> IdunResult` — returns
+- `IdunClient(token=None, backend="azure", base=..., project=..., agent=...,
+  hf_token=..., hf_model=..., github_token=..., github_model=...,
+  ollama_base=..., ollama_model=..., timeout=600)` — reads `FOUNDRY_TOKEN` /
+  `IDUN_BACKEND` / per-backend tokens from env or args.
+- `client.complete(prompt, max_output_tokens=1024) -> IdunResult` — returns
   `text` (final answer) + `steps` (agent trajectory: kind=reasoning|tool).
-- `IdunClient._build_payload(prompt)` — verified shape
+  On non-Azure backends `steps == []` (flat answer, no tool-agent trace).
+- `IdunClient._build_payload(prompt)` — verified Azure shape
   `{"model":"model-router","input":prompt,"max_output_tokens":N}` (NO `tools` key).
-- CLI: `idun login | idun chat "<prompt>" | idun trace "<prompt>"`.
+- CLI: `idun wizard | idun login [--backend X] | idun status |
+  idun chat --backend X "<prompt>" | idun trace "<prompt>"`.
 
 ## Agent trajectory shape
 

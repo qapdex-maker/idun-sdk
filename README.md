@@ -10,12 +10,17 @@
   <img src="https://raw.githubusercontent.com/qapdex-maker/idun-sdk/main/idun/data/foundry_logo_color.svg" width="104" height="110" alt="Azure AI Foundry logo"/>
 </p>
 
-**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry.**
+**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — with a pluggable multi-backend layer.**
 
 No `httpx`, no `azure-identity`, no Flask — it runs headless on Termux/Android with
 nothing but the Python standard library. Idun is a **tool agent** (it reasons and
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 (reasoning steps + tool calls) instead of a black-box answer.
+
+**Multi-backend (v0.1.31+):** the same `IdunClient` API dispatches to
+`azure` (default), `hf` (Hugging Face), `github` (GitHub Models), or `ollama`
+(local). Non-Azure backends need no Foundry token, so Idun keeps working even
+when the Azure subscription is suspended.
 
 ---
 
@@ -69,6 +74,44 @@ for s in res.steps:             # agent trajectory
 | `idun diff` | side-by-side trace diff of two prompts |
 | `idun token` | inspect / refresh the Foundry token |
 | `idun logo` | print the Foundry logo |
+
+## Multi-backend (no Foundry dependency)
+
+Idun runs on four interchangeable backends behind the **same** `IdunClient`
+API. Non-Azure backends need no `FOUNDRY_TOKEN`, so the SDK keeps working even
+when the Azure subscription is suspended.
+
+```bash
+idun wizard                 # universal first-run setup -> writes ~/.idunrc
+idun status                 # show active backend + credential state
+idun login --backend hf     # store a Hugging Face token
+idun chat --backend github "Hello"   # one-shot backend override
+```
+
+| Backend  | Credentials                         | Cost     | Notes |
+|----------|-------------------------------------|----------|-------|
+| `azure`  | Entra device-code (`idun login`)    | paid     | default; full tool-agent trajectory |
+| `hf`     | `HF_TOKEN` / `~/hf_token.txt`       | free tier| serverless Inference API; flat answer |
+| `github` | `GITHUB_TOKEN` / `~/github_token.txt` | free tier | GitHub Models (OpenAI-compatible) |
+| `ollama` | local server at `OLLAMA_BASE`      | free     | no cloud; set `OLLAMA_MODEL` |
+
+Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).
+Per-backend model overrides: `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`,
+`OLLAMA_MODEL`.
+
+```python
+from idun import IdunClient
+
+# Hugging Face (no Azure token needed)
+res = IdunClient(backend="hf", hf_token="hf_xxx", hf_model="microsoft/phi-3-mini-4k-instruct")
+print(res.complete("Hello").text)
+
+# GitHub Models (free)
+res = IdunClient(backend="github", github_token="ghp_xxx").complete("Hi")
+```
+
+Note: non-Azure backends return a flat answer (`res.steps == []`) — the
+tool-agent trajectory (reasoning + `web_search`) is an Azure-Idun feature.
 
 ## MCP server
 
