@@ -163,9 +163,9 @@ def test_contoso_pack_loading():
     names = [p["name"] for p in packs]
     assert "contoso" in names
     contoso = next(p for p in packs if p["name"] == "contoso")
-    assert contoso["count"] == 4
+    assert contoso["count"] == 8
     data = load_pack("contoso")
-    assert len(data["prompts"]) == 4
+    assert len(data["prompts"]) == 8
     text = get_prompt("contoso", "sustainability_summary")
     assert "Kreislauf" in text
     # error path
@@ -361,7 +361,7 @@ def test_run_pack_batch_offline(monkeypatch):
     monkeypatch.setattr(IdunClient, "_post_once", fake_post)
     # all prompts in contoso pack
     full = run_pack("contoso", keys=None, client=c)
-    assert len(full) == 4
+    assert len(full) == 8
     assert all(isinstance(r, object) for _, r in full)
     # subset by key
     sub = run_pack("contoso", keys=["esg_check", "sustainability_summary"], client=c)

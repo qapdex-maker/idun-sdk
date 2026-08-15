@@ -22,6 +22,26 @@
       "key": "competitor_compare",
       "title": "Wettbewerbsvergleich",
       "prompt": "Vergleiche Contoso mit einem realen Wettbewerber in der Kreislaufwirtschaft. Wo ist Contoso führend, wo hinten?"
+    },
+    {
+      "key": "supply_chain_dashboard",
+      "title": "Lieferketten-Dashboard",
+      "prompt": "Entwirf ein Lieferketten-Dashboard für Contoso, das Emissionsberichte automatisiert einsammelt und visualisiert. Welche Datenquellen und KPIs?"
+    },
+    {
+      "key": "product_passport",
+      "title": "Digitaler Produktpass",
+      "prompt": "Beschreibe einen digitalen Produktpass für Contoso-Geräte: welche Daten (Material, Recyclat-Anteil, Reparatur) und wie wird er genutzt?"
+    },
+    {
+      "key": "net_zero_roadmap",
+      "title": "Netto-Null-Roadmap",
+      "prompt": "Skizziere eine Netto-Null-Roadmap für Contoso bis 2035 — Meilensteine, Hebel und Risiken."
+    },
+    {
+      "key": "stakeholder_report",
+      "title": "Stakeholder-Bericht",
+      "prompt": "Entwirf die Gliederung eines Stakeholder-Nachhaltigkeitsberichts für Contoso (CSRD-konform)."
     }
   ]
 }

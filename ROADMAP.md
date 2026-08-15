@@ -11,7 +11,7 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
   `install_requires=[]`. Client + CLI (`idun login|chat|trace|export|
   packs|run|diff|token|logo`), Entra Device-Code-Auth, Token-Auto-Rotation,
   Async (`--async`, jetzt `get_running_loop()` statt deprecated
-  `get_event_loop()`), Trace-Export, Contoso-Prompt-Packs, Side-by-Side-Diff.
+  `get_event_loop()`), Trace-Export, Contoso-Prompt-Packs (8 Demos), Side-by-Side-Diff.
 - **idun-playground**: Dark-Mode (ai.azure.com-Look), Agent-Trace-Panel,
   `diff.html` (Side-by-Side-Spalten), `router.py` (stdlib HTTP-Server mit
   `/api/chat`, `/api/chat/stream` SSE, `/api/diff`, **BrokenPipeError-guarded
