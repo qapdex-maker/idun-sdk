@@ -206,11 +206,18 @@ Offen (unblockiert, optional):
 - **Verify (lokal):** `sh run_tests.sh` → 44 passed; `idun_sdk-0.1.37-py3-none-any.whl`
   enthält `__version__ = "0.1.37"` (Drift behoben). Build-Artefakte in `dist/`.
 
-## Phase 7 — Contoso Expo 2027 (Showcase-Ziel)
-- **Root-Cause:** Die Offline-Tests waren nicht hermetisch — `complete()`/`complete_async()` rufen `maybe_refresh()`, das bei abgelaufenem Token ohne `refresh_token` in den interaktiven `login()` fällt und pytest unendlich blockiert. CI lief nur deshalb grün, weil dort keine Token-Datei existiert.
-- **Fix:** `tests/conftest.py` stubbt `idun.auth.maybe_refresh` via autouse-Fixture → `None`; `welcome.py` startet cmatrix nur bei echtem TTY. Kein Hang, keine Live-Auth im Test.
-- **Verifiziert:** `sh run_tests.sh` → 25 passed in 4.11s. Live auf PyPI (`curl .../0.1.31/json` → 200).
-- CI: grün auf py3.8–3.12.
+## v0.1.38 — OpenAI-Backend + OpenAPI (live auf PyPI)
+- **OpenAI-Backend:** `complete_openai()` ruft jeden OpenAI-compatible
+  `/v1/chat/completions`-Endpoint (api.openai.com default, via `OPENAI_BASE`
+  overridebar für vLLM/LiteLLM-Proxies). `IdunClient` + CLI (`--backend openai`,
+  Wizard, `idun info`) + `idun openapi`-Kommando. Token via `OPENAI_API_KEY` /
+  `~/openai_token.txt`.
+- **OpenAPI:** `idun/openapi.json` — gebündelte OpenAPI-3.0-Spec der
+  Completion-Surface (OpenAI-kompatibles Request/Response-Shape), per
+  `idun openapi` (bzw. `--path`) auslieferbar. Packaged im Wheel.
+- **Tests:** 47/47 grün (openai dispatch-shape, token-required, valid-backends).
+- **Live verifiziert:** PyPI latest = 0.1.38, wheel meldet 0.1.38, openapi.json
+  im Wheel (curl-E2E).
 
 ## Phase 7 — Contoso Expo 2027 (Showcase-Ziel)
 
