@@ -9,9 +9,25 @@
 
 ## Documentation
 
-- [README](README.md) — install, auth (Entra device-code), multi-backend, CLI usage
+- [README](README.md) — install, full setup (all backends), multi-backend, CLI usage
 - [ROADMAP](ROADMAP.md) — status quo + phases 2-4
 - [MCP server](idun_mcp.py) — stdlib-only stdio MCP server (idun_chat, idun_trace)
+
+## Install
+
+- `pip install idun-sdk` (Python >= 3.8, no third-party deps)
+- verify: `idun --help`, `idun welcome`
+
+## Setup (per backend)
+
+- `idun wizard` — universal first-run setup, writes `~/.idunrc`
+- `idun status` — show active backend + credential state
+- azure:   `idun login`                 -> `~/foundry_token.txt` (device-code, no admin role)
+- hf:      `idun login --backend hf`    -> `~/hf_token.txt` / `HF_TOKEN`
+- github:  `idun login --backend github`-> `~/github_token.txt` / `GITHUB_TOKEN`
+- ollama:  set `OLLAMA_BASE` + `OLLAMA_MODEL` (local server)
+- switch:  `export IDUN_BACKEND=hf` (global) or `idun chat --backend github "..."` (one-off)
+- config override envs: `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`, `OLLAMA_MODEL`
 
 ## Key API
 
@@ -25,7 +41,8 @@
 - `IdunClient._build_payload(prompt)` — verified Azure shape
   `{"model":"model-router","input":prompt,"max_output_tokens":N}` (NO `tools` key).
 - CLI: `idun wizard | idun login [--backend X] | idun status |
-  idun chat --backend X "<prompt>" | idun trace "<prompt>"`.
+  idun chat --backend X "<prompt>" | idun trace "<prompt>" |
+  idun packs | idun run <pack> <key> | idun diff "<a>" "<b>" | idun export`.
 
 ## Agent trajectory shape
 

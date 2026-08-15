@@ -54,7 +54,7 @@ def get_prompt(name: str, key: str) -> str:
     raise KeyError(f"Prompt key {key!r} not in pack {name!r}. Available: {available}")
 
 
-def run_pack(name: str, keys=None, client=None, max_output_tokens: int = 4096):
+def run_pack(name: str, keys=None, client=None, max_output_tokens: int = 1024):
     """Run one or many prompts from a pack and return (key, result) pairs.
 
     keys=None (default) runs EVERY prompt in the pack (batch). Pass a list to
