@@ -175,9 +175,38 @@ Offen (unblockiert, optional):
 - **v0.1.29** — CLI `--help` Examples für alle 10 Subcommands (argparse description).
 - **v0.1.30** — `fix(welcome)`: Screen-Reset nach cmatrix erzwingen, damit ASCII-Banner sauber rendert; `test_welcome.py` (3 Tests) grün.
 - **v0.1.31** — Hermetische Test-Suite: `maybe_refresh` im Offline gestubbt + `cmatrix` nur auf echtem TTY → behebt den 180s-Hang; 25/25 Tests grün. **Aktueller Stand.**
-- PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live (inkl. 0.1.31).
+- PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live (inkl. 0.1.36).
+  Hinweis: git-Tags hinkten hinterher (nur bis v0.1.31 getaggt) — am
+  2026-08-15 nachgeholt (v0.1.32–v0.1.37), damit Tag-Historie == PyPI passt.
 
-## v0.1.31 — Test-Suite-Härtung (ERLEDIGT, live verifiziert)
+## Release-Historie (Fortsetzung, 2026-08-15 synchronisiert)
+
+- **v0.1.32** — Multi-Backend-Doku (README/llms.txt) + PyPI-Bump.
+- **v0.1.33** — Vollständige Install/Setup-Anleitung für alle Backends; License-Feld.
+- **v0.1.34** — MCP-Version-Sync, `run_pack`-Default vereinheitlicht.
+- **v0.1.35** — `idun hf`-CLI + HF-Pipeline (whoami/status/push), live gegen Hub verifiziert.
+- **v0.1.36** — Cleanup/Repo-Hygiene. **BEKANNTER DEFEKT:** `__init__.__version__`
+  blieb auf `0.1.31` gepinnt (nur `setup.py` wurde pro Release gebumpt) →
+  jedes veröffentlichte Wheel meldete fälschlich `0.1.31` als eigene Version.
+- **v0.1.37** — **Fix:** Single-Source-Version (`setup.py` liest `__version__` aus
+  `idun/__init__.py`). **Ollama (local-model) Backend entfernt** — Multi-Backend-Fokus
+  liegt auf `azure` / `hf` / `github`. 44/44 Tests grün, Wheel meldet korrekt `0.1.37`.
+  Lokal committet + getaggt; **Push + PyPI-Upload ausstehend** (GitHub/PyPI-Auth in
+  dieser Session nicht verfügbar — Blocker, kein Fake).
+
+## v0.1.37 — Ollama entfernt + Version-Single-Source (lokal fertig, publish offen)
+- **Ollama-Rewrite:** `complete_ollama` + `OLLAMA_*`-Konstanten + Dispatch entfernt aus
+  `backends.py`; `VALID_BACKENDS = ("azure", "hf", "github")`. `IdunClient`, CLI
+  `--backend`-choices, Wizard und `idun info` haben keinen ollama-Zweig mehr.
+- **Version-Drift gefixt:** `setup.py` liest `__version__` aus `idun/__init__.py`
+  (keine Import-Seiteneffekte). Damit kann `setup.py` künftig nicht mehr vom
+  Package-Version abweichen.
+- **Dok-Sync:** README, llms.txt, setup.py description aktualisiert (kein ollama mehr).
+- **Tests:** `test_multi_backend.py` ollama-Tests durch `unknown-backend`-Abweisung ersetzt.
+- **Verify (lokal):** `sh run_tests.sh` → 44 passed; `idun_sdk-0.1.37-py3-none-any.whl`
+  enthält `__version__ = "0.1.37"` (Drift behoben). Build-Artefakte in `dist/`.
+
+## Phase 7 — Contoso Expo 2027 (Showcase-Ziel)
 - **Root-Cause:** Die Offline-Tests waren nicht hermetisch — `complete()`/`complete_async()` rufen `maybe_refresh()`, das bei abgelaufenem Token ohne `refresh_token` in den interaktiven `login()` fällt und pytest unendlich blockiert. CI lief nur deshalb grün, weil dort keine Token-Datei existiert.
 - **Fix:** `tests/conftest.py` stubbt `idun.auth.maybe_refresh` via autouse-Fixture → `None`; `welcome.py` startet cmatrix nur bei echtem TTY. Kein Hang, keine Live-Auth im Test.
 - **Verifiziert:** `sh run_tests.sh` → 25 passed in 4.11s. Live auf PyPI (`curl .../0.1.31/json` → 200).
