@@ -177,8 +177,6 @@ class IdunClient:
         hf_model: Optional[str] = None,
         github_token: Optional[str] = None,
         github_model: Optional[str] = None,
-        ollama_base: Optional[str] = None,
-        ollama_model: Optional[str] = None,
     ) -> None:
         # --- backend selection (multi-backend support) ---
         self.backend = (backend or os.environ.get("IDUN_BACKEND", "azure")).strip().lower()
@@ -191,8 +189,6 @@ class IdunClient:
         self.hf_model = hf_model or os.environ.get("HF_MODEL") or _be.HF_DEFAULT_MODEL
         self.github_token = github_token if github_token is not None else _be.load_github_token()
         self.github_model = github_model or os.environ.get("GITHUB_MODEL") or _be.GITHUB_DEFAULT_MODEL
-        self.ollama_base = ollama_base or os.environ.get("OLLAMA_BASE") or _be.OLLAMA_DEFAULT_BASE
-        self.ollama_model = ollama_model or os.environ.get("OLLAMA_MODEL") or _be.OLLAMA_DEFAULT_MODEL
         # --- azure defaults (unchanged) ---
         self.token = token or os.environ.get("FOUNDRY_TOKEN")
         self.base = base.rstrip("/")
@@ -267,7 +263,7 @@ class IdunClient:
 
         Backend dispatch:
           - azure : Foundry agent (token-managed, retries on 5xx/401).
-          - hf / github / ollama : external backends, no Foundry token needed.
+          - hf / github : external backends, no Foundry token needed.
 
         The non-azure backends return a flat answer (no tool-agent trajectory),
         so `steps` is empty and `model` is the backend model id.
@@ -277,7 +273,6 @@ class IdunClient:
                 self.backend, prompt,
                 hf_token=self.hf_token, hf_model=self.hf_model,
                 github_token=self.github_token, github_model=self.github_model,
-                ollama_base=self.ollama_base, ollama_model=self.ollama_model,
                 timeout=self.timeout, max_tokens=max_output_tokens,
             )
             return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})
@@ -380,7 +375,6 @@ class IdunClient:
                 _be.run_external, self.backend, prompt,
                 hf_token=self.hf_token, hf_model=self.hf_model,
                 github_token=self.github_token, github_model=self.github_model,
-                ollama_base=self.ollama_base, ollama_model=self.ollama_model,
                 timeout=self.timeout, max_tokens=max_output_tokens)
             text, model = await loop.run_in_executor(None, fn)
             return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})

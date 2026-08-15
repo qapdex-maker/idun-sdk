@@ -34,7 +34,7 @@ BANNER = r"""
 
 
 def _add_backend_arg(p):
-    p.add_argument("--backend", choices=["azure", "hf", "github", "ollama"],
+    p.add_argument("--backend", choices=["azure", "hf", "github"],
                    default="azure", help="completion backend (default: azure)")
 
 
@@ -137,9 +137,6 @@ def cmd_status(_args):
         tok = be.load_github_token()
         print(f"  github token : {'present' if tok else 'MISSING'}")
         print(f"  gh model     : {os.environ.get('GITHUB_MODEL') or be.GITHUB_DEFAULT_MODEL}")
-    elif backend == "ollama":
-        print(f"  ollama base  : {os.environ.get('OLLAMA_BASE') or be.OLLAMA_DEFAULT_BASE}")
-        print(f"  ollama model : {os.environ.get('OLLAMA_MODEL') or be.OLLAMA_DEFAULT_MODEL}")
 
 
 def cmd_hf(args):
@@ -211,9 +208,9 @@ def cmd_wizard(_args):
     print("  1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.")
     print("  2) hf      — Hugging Face Inference API (free tier, needs HF token).")
     print("  3) github  — GitHub Models (free tier, needs GitHub PAT).")
-    print("  4) ollama  — local Ollama server (free, no cloud).")
-    choice = input("Select backend [1-4]: ").strip()
-    mapping = {"1": "azure", "2": "hf", "3": "github", "4": "ollama"}
+    print("  3) github  — GitHub Models (free tier, needs GitHub PAT).")
+    choice = input("Select backend [1-3]: ").strip()
+    mapping = {"1": "azure", "2": "hf", "3": "github"}
     backend = mapping.get(choice, "azure")
     print(f"Selected: {backend}\n")
 
@@ -244,14 +241,6 @@ def cmd_wizard(_args):
         if model:
             cfg["GITHUB_MODEL"] = model
         cfg["IDUN_BACKEND"] = "github"
-    elif backend == "ollama":
-        base = input(f"Ollama base URL [default: {backends.OLLAMA_DEFAULT_BASE}]: ").strip()
-        if base:
-            cfg["OLLAMA_BASE"] = base
-        model = input(f"Ollama model [default: {backends.OLLAMA_DEFAULT_MODEL}]: ").strip()
-        if model:
-            cfg["OLLAMA_MODEL"] = model
-        cfg["IDUN_BACKEND"] = "ollama"
 
     # write ~/.idunrc (shell env file)
     rc = os.path.join(os.path.expanduser("~"), ".idunrc")

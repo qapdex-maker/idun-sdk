@@ -19,7 +19,7 @@ calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 
 ## Multi-backend
 
-The same `IdunClient` API dispatches to four interchangeable backends. Non-Azure
+The same `IdunClient` API dispatches to three interchangeable backends. Non-Azure
 backends need no `FOUNDRY_TOKEN`, so the SDK keeps working even when the Azure
 subscription is suspended.
 
@@ -28,10 +28,9 @@ subscription is suspended.
 | `azure`  | Entra device-code (`idun login`)     | paid     | default; full tool-agent trajectory |
 | `hf`     | `HF_TOKEN` / `~/hf_token.txt`        | free     | Hugging Face Inference API; flat answer |
 | `github` | `GITHUB_TOKEN` / `~/github_token.txt` | free tier | GitHub Models (OpenAI-compatible); **needs Copilot/VS Code routing — plain PAT returns 404** |
-| `ollama` | local server at `OLLAMA_BASE`        | free     | no cloud; set `OLLAMA_MODEL` |
 
 Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).
-Model overrides: `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`, `OLLAMA_MODEL`.
+Model overrides: `HF_MODEL`, `GITHUB_MODEL`.
 Non-Azure backends return a flat answer (`res.steps == []`) — the tool-agent
 trajectory is an Azure-Idun feature.
 
@@ -71,7 +70,6 @@ idun status          # confirm active backend + credential state
 | `azure`  | `idun login`                               | `~/foundry_token.txt`      |
 | `hf`     | `idun login --backend hf`                  | `~/hf_token.txt` / `HF_TOKEN` |
 | `github` | `idun login --backend github`              | `~/github_token.txt` / `GITHUB_TOKEN` |
-| `ollama` | start a local server, set `OLLAMA_BASE`    | env `OLLAMA_BASE` / `OLLAMA_MODEL` |
 
 **Azure (default).** `idun login` runs a device-code flow and stores an Entra
 bearer token. **No admin role required** — any tenant user with agent RBAC can
@@ -82,13 +80,6 @@ The token auto-rotates before expiry.
 a token and saves it (0600). Both offer a free tier; no Azure subscription or
 card needed.
 
-**Ollama.** Run a local Ollama server (e.g. `ollama serve`) and point Idun at it:
-
-```bash
-export OLLAMA_BASE=http://localhost:11434
-export OLLAMA_MODEL=llama3.1
-```
-
 ### Switching backends
 
 Globally via env, or per call via `--backend`:
@@ -98,8 +89,7 @@ export IDUN_BACKEND=hf          # all future calls use HF
 idun chat --backend github "Hi" # one-off override
 ```
 
-Model overrides (optional): `HF_MODEL`, `GITHUB_MODEL`, `OLLAMA_BASE`,
-`OLLAMA_MODEL`.
+Model overrides (optional): `HF_MODEL`, `GITHUB_MODEL`.
 
 ### Quick test
 
