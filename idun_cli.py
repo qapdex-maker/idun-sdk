@@ -34,7 +34,7 @@ BANNER = r"""
 
 
 def _add_backend_arg(p):
-    p.add_argument("--backend", choices=["azure", "hf", "github"],
+    p.add_argument("--backend", choices=["azure", "hf", "github", "openai"],
                    default="azure", help="completion backend (default: azure)")
 
 
@@ -117,6 +117,16 @@ def cmd_logo(_args):
     print(f"  color : {logo_path('color')}")
 
 
+def cmd_openapi(args):
+    """Print the bundled OpenAPI 3 spec (or its path)."""
+    from idun import openapi_path
+    if getattr(args, "path", False):
+        print(openapi_path())
+        return
+    with open(openapi_path(), encoding="utf-8") as f:
+        print(f.read())
+
+
 def cmd_welcome(_args):
     show_welcome(force_cmatrix=True)
 
@@ -137,6 +147,11 @@ def cmd_status(_args):
         tok = be.load_github_token()
         print(f"  github token : {'present' if tok else 'MISSING'}")
         print(f"  gh model     : {os.environ.get('GITHUB_MODEL') or be.GITHUB_DEFAULT_MODEL}")
+    elif backend == "openai":
+        tok = be.load_openai_token()
+        print(f"  openai token : {'present' if tok else 'MISSING'}")
+        print(f"  openai model : {os.environ.get('OPENAI_MODEL') or be.OPENAI_DEFAULT_MODEL}")
+        print(f"  openai base  : {os.environ.get('OPENAI_BASE') or be.OPENAI_DEFAULT_BASE}")
 
 
 def cmd_hf(args):
@@ -208,9 +223,9 @@ def cmd_wizard(_args):
     print("  1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.")
     print("  2) hf      — Hugging Face Inference API (free tier, needs HF token).")
     print("  3) github  — GitHub Models (free tier, needs GitHub PAT).")
-    print("  3) github  — GitHub Models (free tier, needs GitHub PAT).")
-    choice = input("Select backend [1-3]: ").strip()
-    mapping = {"1": "azure", "2": "hf", "3": "github"}
+    print("  4) openai  — OpenAI-compatible /v1/chat/completions (needs OPENAI_API_KEY).")
+    choice = input("Select backend [1-4]: ").strip()
+    mapping = {"1": "azure", "2": "hf", "3": "github", "4": "openai"}
     backend = mapping.get(choice, "azure")
     print(f"Selected: {backend}\n")
 
@@ -241,6 +256,18 @@ def cmd_wizard(_args):
         if model:
             cfg["GITHUB_MODEL"] = model
         cfg["IDUN_BACKEND"] = "github"
+    elif backend == "openai":
+        tok = input("OpenAI API key (sk-...) [or blank for OPENAI_API_KEY env]: ").strip()
+        if tok:
+            from idun.backends import save_openai_token
+            save_openai_token(tok)
+        model = input(f"OpenAI model [default: {backends.OPENAI_DEFAULT_MODEL}]: ").strip()
+        if model:
+            cfg["OPENAI_MODEL"] = model
+        base = input(f"OpenAI base URL [default: {backends.OPENAI_DEFAULT_BASE}]: ").strip()
+        if base:
+            cfg["OPENAI_BASE"] = base
+        cfg["IDUN_BACKEND"] = "openai"
 
     # write ~/.idunrc (shell env file)
     rc = os.path.join(os.path.expanduser("~"), ".idunrc")
@@ -458,6 +485,16 @@ def build_parser() -> argparse.ArgumentParser:
     ppush.add_argument("files", nargs="+", help="local files to upload")
     ppush.add_argument("--private", action="store_true", help="create a private repo")
     ph.set_defaults(func=cmd_hf)
+
+    po = sub.add_parser(
+        "openapi",
+        help="print the bundled OpenAPI 3 spec for the completion API",
+        description=("Print the bundled OpenAPI 3.0 spec describing Idun's OpenAI-compatible "
+                     "completion surface. Pipe to a file or Swagger UI to drive Idun from any "
+                     "OpenAPI client.\n\nExample:\n  idun openapi\n  idun openapi > openapi.json"),
+    )
+    po.add_argument("--path", action="store_true", help="print the on-disk path instead of the spec")
+    po.set_defaults(func=cmd_openapi)
 
     return p
 

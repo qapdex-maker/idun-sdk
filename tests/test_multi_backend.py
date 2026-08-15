@@ -26,8 +26,8 @@ def test_invalid_backend_rejected():
         IdunClient(backend="nope")
 
 
-def test_valid_backends_are_azure_hf_github():
-    assert be.VALID_BACKENDS == ("azure", "hf", "github")
+def test_valid_backends_are_azure_hf_github_openai():
+    assert be.VALID_BACKENDS == ("azure", "hf", "github", "openai")
 
 
 def test_env_overrides_for_models(monkeypatch):
@@ -64,6 +64,36 @@ def test_run_external_unknown_backend():
     import pytest
     with pytest.raises(ValueError):
         be.run_external("ollama", "hi")
+
+
+def test_openai_in_valid_backends():
+    assert "openai" in be.VALID_BACKENDS
+
+
+def test_run_external_openai_shape(monkeypatch):
+    captured = {}
+
+    def fake(prompt, token, model, base="https://api.openai.com/v1",
+             timeout=120, max_tokens=1024):
+        captured["prompt"] = prompt
+        captured["model"] = model
+        captured["base"] = base
+        return f"openai:{prompt}", model
+
+    monkeypatch.setattr(be, "complete_openai", fake)
+    text, model = be.run_external("openai", "hi", openai_token="sk-x",
+                                  openai_model="gpt-4o-mini",
+                                  openai_base="https://api.openai.com/v1")
+    assert text == "openai:hi"
+    assert model == "gpt-4o-mini"
+    assert captured["model"] == "gpt-4o-mini"
+
+
+def test_run_external_openai_requires_token():
+    import pytest
+    with pytest.raises(RuntimeError):
+        # no token -> should refuse before any network call
+        be.run_external("openai", "hi", openai_token="")
 
 
 def test_complete_hf_returns_idunresult(monkeypatch):

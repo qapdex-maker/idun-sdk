@@ -28,9 +28,10 @@ subscription is suspended.
 | `azure`  | Entra device-code (`idun login`)     | paid     | default; full tool-agent trajectory |
 | `hf`     | `HF_TOKEN` / `~/hf_token.txt`        | free     | Hugging Face Inference API; flat answer |
 | `github` | `GITHUB_TOKEN` / `~/github_token.txt` | free tier | GitHub Models (OpenAI-compatible); **needs Copilot/VS Code routing — plain PAT returns 404** |
+| `openai` | `OPENAI_API_KEY` / `~/openai_token.txt` | paid/free tier | OpenAI-compatible `/v1/chat/completions`; any OpenAI-compatible endpoint via `OPENAI_BASE` |
 
 Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).
-Model overrides: `HF_MODEL`, `GITHUB_MODEL`.
+Model overrides: `HF_MODEL`, `GITHUB_MODEL`, `OPENAI_MODEL`, `OPENAI_BASE`.
 Non-Azure backends return a flat answer (`res.steps == []`) — the tool-agent
 trajectory is an Azure-Idun feature.
 
@@ -70,6 +71,7 @@ idun status          # confirm active backend + credential state
 | `azure`  | `idun login`                               | `~/foundry_token.txt`      |
 | `hf`     | `idun login --backend hf`                  | `~/hf_token.txt` / `HF_TOKEN` |
 | `github` | `idun login --backend github`              | `~/github_token.txt` / `GITHUB_TOKEN` |
+| `openai` | `idun login --backend openai`             | `~/openai_token.txt` / `OPENAI_API_KEY` |
 
 **Azure (default).** `idun login` runs a device-code flow and stores an Entra
 bearer token. **No admin role required** — any tenant user with agent RBAC can

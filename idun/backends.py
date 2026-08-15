@@ -160,7 +160,72 @@ def complete_github(prompt: str, token: str, model: str, timeout: int = 120,
     return text, model
 
 
-VALID_BACKENDS = ("azure", "hf", "github")
+# --------------------------------------------------------------------------
+# OpenAI (OpenAI-compatible /v1/chat/completions)
+#
+# Works against api.openai.com AND any OpenAI-compatible endpoint
+# (e.g. a local vLLM / LiteLLM proxy) by overriding OPENAI_BASE.
+# --------------------------------------------------------------------------
+
+OPENAI_TOKEN_FILE = os.path.join(os.path.expanduser("~"), "openai_token.txt")
+OPENAI_DEFAULT_BASE = "https://api.openai.com/v1"
+OPENAI_DEFAULT_MODEL = "gpt-4o-mini"
+
+
+def load_openai_token() -> str:
+    env = os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENAI_TOKEN")
+    if env:
+        return env
+    try:
+        return open(OPENAI_TOKEN_FILE, "r", encoding="utf-8").read().strip()
+    except OSError:
+        return ""
+
+
+def save_openai_token(token: str) -> None:
+    os.makedirs(os.path.dirname(OPENAI_TOKEN_FILE), exist_ok=True)
+    with open(OPENAI_TOKEN_FILE, "w", encoding="utf-8") as f:
+        f.write(token.strip())
+    try:
+        os.chmod(OPENAI_TOKEN_FILE, 0o600)
+    except OSError:
+        pass
+
+
+def complete_openai(prompt: str, token: str, model: str,
+                    base: str = OPENAI_DEFAULT_BASE,
+                    timeout: int = 120, max_tokens: int = 1024) -> tuple[str, str]:
+    """Run a prompt through an OpenAI-compatible /v1/chat/completions endpoint.
+
+    Returns (text, model). Uses OPENAI_API_KEY (or OPENAI_TOKEN / ~/openai_token.txt).
+    """
+    url = f"{base.rstrip('/')}/chat/completions"
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    req = urllib.request.Request(
+        url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        msg = e.read().decode("utf-8", "replace")[:400]
+        raise RuntimeError(f"OpenAI HTTP {e.code}: {msg}") from e
+    text = ""
+    try:
+        text = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        text = json.dumps(data, ensure_ascii=False)[:400]
+    return text, model
+
+
+VALID_BACKENDS = ("azure", "hf", "github", "openai")
 
 
 def backend_from_env() -> str:
@@ -185,8 +250,10 @@ def _extract_last_user(messages: list) -> str:
 
 def run_external(backend: str, prompt: str, *, hf_token: str = "",
                  hf_model: str = HF_DEFAULT_MODEL, github_token: str = "",
-                 github_model: str = GITHUB_DEFAULT_MODEL, timeout: int = 300,
-                 max_tokens: int = 1024) -> tuple[str, str]:
+                 github_model: str = GITHUB_DEFAULT_MODEL,
+                 openai_token: str = "", openai_model: str = OPENAI_DEFAULT_MODEL,
+                 openai_base: str = OPENAI_DEFAULT_BASE,
+                 timeout: int = 300, max_tokens: int = 1024) -> tuple[str, str]:
     """Dispatch a single prompt to the chosen non-azure backend.
 
     Returns (text, model_name). Raises ValueError on unknown backend.
@@ -199,4 +266,9 @@ def run_external(backend: str, prompt: str, *, hf_token: str = "",
             raise RuntimeError("GitHub backend needs GITHUB_TOKEN (env or ~/github_token.txt).")
         return complete_github(prompt, github_token, github_model,
                                timeout=timeout, max_tokens=max_tokens)
+    if backend == "openai":
+        if not openai_token:
+            raise RuntimeError("OpenAI backend needs OPENAI_API_KEY (env or ~/openai_token.txt).")
+        return complete_openai(prompt, openai_token, openai_model,
+                               base=openai_base, timeout=timeout, max_tokens=max_tokens)
     raise ValueError(f"unknown backend: {backend!r}")
