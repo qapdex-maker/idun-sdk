@@ -177,6 +177,9 @@ class IdunClient:
         hf_model: Optional[str] = None,
         github_token: Optional[str] = None,
         github_model: Optional[str] = None,
+        openai_token: Optional[str] = None,
+        openai_model: Optional[str] = None,
+        openai_base: Optional[str] = None,
     ) -> None:
         # --- backend selection (multi-backend support) ---
         self.backend = (backend or os.environ.get("IDUN_BACKEND", "azure")).strip().lower()
@@ -189,6 +192,9 @@ class IdunClient:
         self.hf_model = hf_model or os.environ.get("HF_MODEL") or _be.HF_DEFAULT_MODEL
         self.github_token = github_token if github_token is not None else _be.load_github_token()
         self.github_model = github_model or os.environ.get("GITHUB_MODEL") or _be.GITHUB_DEFAULT_MODEL
+        self.openai_token = openai_token if openai_token is not None else _be.load_openai_token()
+        self.openai_model = openai_model or os.environ.get("OPENAI_MODEL") or _be.OPENAI_DEFAULT_MODEL
+        self.openai_base = openai_base or os.environ.get("OPENAI_BASE") or _be.OPENAI_DEFAULT_BASE
         # --- azure defaults (unchanged) ---
         self.token = token or os.environ.get("FOUNDRY_TOKEN")
         self.base = base.rstrip("/")
@@ -273,6 +279,8 @@ class IdunClient:
                 self.backend, prompt,
                 hf_token=self.hf_token, hf_model=self.hf_model,
                 github_token=self.github_token, github_model=self.github_model,
+                openai_token=self.openai_token, openai_model=self.openai_model,
+                openai_base=self.openai_base,
                 timeout=self.timeout, max_tokens=max_output_tokens,
             )
             return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})
@@ -375,6 +383,8 @@ class IdunClient:
                 _be.run_external, self.backend, prompt,
                 hf_token=self.hf_token, hf_model=self.hf_model,
                 github_token=self.github_token, github_model=self.github_model,
+                openai_token=self.openai_token, openai_model=self.openai_model,
+                openai_base=self.openai_base,
                 timeout=self.timeout, max_tokens=max_output_tokens)
             text, model = await loop.run_in_executor(None, fn)
             return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})

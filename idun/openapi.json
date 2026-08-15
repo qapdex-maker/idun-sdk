@@ -1,0 +1,93 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Idun SDK — Completion API",
+    "version": "0.1.38",
+    "description": "OpenAPI description of the Idun SDK completion surface. Idun is a stdlib-only client + CLI for the NatureLM-Idun-5-MoE agent on Azure AI Foundry, with a pluggable multi-backend layer (azure / hf / github / openai). The chat completion shape mirrors the OpenAI /v1/chat/completions request/response so Idun can be driven by any OpenAI-compatible client or OpenAPI tool.",
+    "license": { "name": "MIT" }
+  },
+  "servers": [
+    { "url": "https://api.openai.com/v1", "description": "OpenAI-compatible reference (override with OPENAI_BASE)" }
+  ],
+  "paths": {
+    "/chat/completions": {
+      "post": {
+        "operationId": "idunChatCompletion",
+        "summary": "Run a prompt through the selected Idun backend",
+        "description": "Mirrors the OpenAI chat completion request. Idun dispatches to the active backend (azure/hf/github/openai) and returns an OpenAI-shaped response so existing OpenAI SDKs work unchanged.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChatCompletionRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Completion (OpenAI-shaped)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ChatCompletionResponse" }
+              }
+            }
+          },
+          "400": { "description": "Invalid backend or missing credentials" },
+          "401": { "description": "Auth failure (e.g. expired Foundry token)" },
+          "500": { "description": "Upstream backend error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Message": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": { "type": "string", "enum": ["system", "user", "assistant"], "description": "Only the last 'user' turn is sent to non-Idun backends." },
+          "content": { "type": "string" }
+        }
+      },
+      "ChatCompletionRequest": {
+        "type": "object",
+        "required": ["model", "messages"],
+        "properties": {
+          "model": { "type": "string", "description": "Backend model id, e.g. 'gpt-4o-mini' (openai), 'microsoft/phi-3-mini-4k-instruct' (hf), 'model-router' (azure)." },
+          "messages": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Message" }
+          },
+          "max_tokens": { "type": "integer", "default": 1024, "description": "Max tokens for the completion." },
+          "stream": { "type": "boolean", "default": false, "description": "Idun returns a single response (no SSE) in this SDK surface." }
+        }
+      },
+      "ChatCompletionResponse": {
+        "type": "object",
+        "required": ["choices"],
+        "properties": {
+          "id": { "type": "string" },
+          "object": { "type": "string", "enum": ["chat.completion"] },
+          "model": { "type": "string", "description": "The backend model that produced the answer." },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "index": { "type": "integer" },
+                "message": {
+                  "type": "object",
+                  "properties": {
+                    "role": { "type": "string", "enum": ["assistant"] },
+                    "content": { "type": "string", "description": "Final answer text. Non-azure backends return a flat answer here; for azure the full tool-agent trajectory is available via `idun trace`." }
+                  }
+                },
+                "finish_reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
