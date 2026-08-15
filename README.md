@@ -27,7 +27,7 @@ subscription is suspended.
 |----------|--------------------------------------|----------|-------|
 | `azure`  | Entra device-code (`idun login`)     | paid     | default; full tool-agent trajectory |
 | `hf`     | `HF_TOKEN` / `~/hf_token.txt`        | free     | Hugging Face Inference API; flat answer |
-| `github` | `GITHUB_TOKEN` / `~/github_token.txt`| free     | GitHub Models (OpenAI-compatible) |
+| `github` | `GITHUB_TOKEN` / `~/github_token.txt` | free tier | GitHub Models (OpenAI-compatible); **needs Copilot/VS Code routing — plain PAT returns 404** |
 | `ollama` | local server at `OLLAMA_BASE`        | free     | no cloud; set `OLLAMA_MODEL` |
 
 Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).

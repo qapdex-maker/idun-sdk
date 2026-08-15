@@ -95,6 +95,12 @@ def complete_hf(prompt: str, token: str, model: str, timeout: int = 120,
 
 # --------------------------------------------------------------------------
 # GitHub Models (free tier, OpenAI-compatible)
+#
+# NOTE: GitHub Models inference is bound to Copilot / VS Code and is NOT
+# freely callable with a plain PAT at models.inference.ai.azure.com — that
+# endpoint returns 404 for standard PATs. The code below is kept for
+# environments where the endpoint is reachable (e.g. GitHub Codespaces /
+# Copilot routing). For a guaranteed-free path use the `hf` backend instead.
 # --------------------------------------------------------------------------
 
 GITHUB_TOKEN_FILE = os.path.join(os.path.expanduser("~"), "github_token.txt")
