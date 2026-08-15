@@ -182,3 +182,13 @@ Offen (unblockiert, optional):
 - **Fix:** `tests/conftest.py` stubbt `idun.auth.maybe_refresh` via autouse-Fixture → `None`; `welcome.py` startet cmatrix nur bei echtem TTY. Kein Hang, keine Live-Auth im Test.
 - **Verifiziert:** `sh run_tests.sh` → 25 passed in 4.11s. Live auf PyPI (`curl .../0.1.31/json` → 200).
 - CI: grün auf py3.8–3.12.
+
+## Phase 7 — Contoso Expo 2027 (Showcase-Ziel)
+
+- Das `expo.html` im Playground konsumiert die SDK-Prompt-Pack-Oberfläche
+  (`list_packs` / `load_pack` / `get_prompt` / `run_pack`) über den Router
+  (`/api/expo`, `/api/packs`, `/api/run`) — SDK-Parity bleibt die einzige
+  Live-Schicht, kein neuer Code im SDK nötig.
+- Das `contoso_pack.json` (`idun/data/prompt_packs/`) ist die Demo-Quelle für
+  die Expo-Demos (Nachhaltigkeit, ESG, Web-Recherche, Wettbewerb). Neue
+  `*.json`-Packs erscheinen automatisch im Expo — kein UI-Change nötig.
