@@ -55,6 +55,23 @@ export IDUN_LOCAL_BASE=http://127.0.0.1:8080/v1   # llama.cpp / vLLM / LiteLLM
 idun-multi -p local ask "hello"
 ```
 
+### Azure Foundry: bring your own resource
+
+**No tenant is bundled with this package.** The `azure` provider is configured
+entirely from the environment, and `IdunClient()` raises a clear error rather
+than pointing you at somebody else's resource:
+
+```bash
+export IDUN_BASE=https://<your-resource>.services.ai.azure.com
+export IDUN_PROJECT=<your-project>
+export IDUN_AGENT=<your-agent>          # optional, default NatureLM-Idun-5-MoE
+export IDUN_TENANT=<your-tenant-guid>   # optional, default "organizations"
+idun login                              # Entra device-code
+```
+
+Persist them in `~/.idunrc` (mode 0600, outside the repo) and
+`source ~/.idunrc`. Every other provider works with no Azure config at all.
+
 Python API:
 
 ```python

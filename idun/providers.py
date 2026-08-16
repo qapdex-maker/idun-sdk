@@ -86,6 +86,10 @@ class Provider:
         return f"IDUN_{self.id.upper().replace('-', '_')}_BASE"
 
     def resolved_base(self) -> str:
+        # Azure keeps its established IDUN_BASE name; others use IDUN_<ID>_BASE.
+        if self.id == "azure":
+            return (os.environ.get("IDUN_BASE")
+                    or os.environ.get(self.base_env()) or self.base)
         return os.environ.get(self.base_env(), self.base)
 
     def resolved_model(self) -> str:
@@ -100,11 +104,12 @@ REGISTRY: tuple[Provider, ...] = (
     Provider(
         id="azure",
         label="Azure AI Foundry (NatureLM-Idun)",
-        base="https://qmfi-research-project-resource.services.ai.azure.com",
+        # No tenant baked in: configure with IDUN_BASE / IDUN_PROJECT.
+        base="https://<resource>.services.ai.azure.com",
         default_model="model-router",
         env_keys=("IDUN_TOKEN", "AZURE_TOKEN"),
         models=("model-router",),
-        notes="Entra device-code auth; tool-agent trace with web_search.",
+        notes="Set IDUN_BASE + IDUN_PROJECT; Entra device-code via `idun login`.",
         transport="azure",
     ),
     Provider(

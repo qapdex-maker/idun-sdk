@@ -233,9 +233,11 @@ def cmd_wizard(_args):
     if backend == "azure":
         print("Azure setup requires a tenant + Foundry resource.")
         print("Run `idun login --backend azure` and complete the device-code flow.")
-        print("Then (optional) set env to point at your resource:")
+        print("REQUIRED: no tenant ships with this package — point it at yours:")
         print("  export IDUN_BASE=https://<resource>.services.ai.azure.com")
-        print("  export IDUN_PROJECT=<project>   IDUN_AGENT=<agent>")
+        print("  export IDUN_PROJECT=<project>")
+        print("  export IDUN_AGENT=<agent>          # optional")
+        print("  export IDUN_TENANT=<tenant-guid>   # optional")
         cfg["IDUN_BACKEND"] = "azure"
     elif backend == "hf":
         tok = input("Hugging Face token (hf_...) [or blank for anonymous]: ").strip()

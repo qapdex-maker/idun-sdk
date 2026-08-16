@@ -62,7 +62,7 @@ setup(
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     author="Idun",
-    author_email="alexanderkleine@qmfiresearch.onmicrosoft.com",
+    author_email="qapdex@gmail.com",
     license="MIT",
     url="https://github.com/qapdex-maker/idun-sdk",
     project_urls={

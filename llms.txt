@@ -25,6 +25,11 @@
 - per-provider overrides: `IDUN_<ID>_MODEL`, `IDUN_<ID>_BASE` — point `local`
   or `openai` at any OpenAI-compatible server (llama.cpp, vLLM, LiteLLM).
 - active provider: `IDUN_PROVIDER` (legacy `IDUN_BACKEND` still honoured).
+- NO Azure tenant is bundled (v0.2.1+). The azure provider needs
+  `IDUN_BASE` + `IDUN_PROJECT` (optional `IDUN_AGENT`, `IDUN_TENANT`,
+  `IDUN_API_VERSION`); `IdunClient()` raises ValueError when unconfigured.
+  Entra defaults to the multi-tenant "organizations" endpoint. All non-azure
+  providers need no Azure configuration at all.
 
 ## idun-multi CLI
 

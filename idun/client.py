@@ -24,14 +24,47 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-# --- defaults (verified working for qmfi-research-project, 2026-07-25) ---
-FOUNDRY_BASE_DEFAULT = "https://qmfi-research-project-resource.services.ai.azure.com"
-FOUNDRY_PROJECT_DEFAULT = "qmfi-research-project"
+# --- Azure Foundry configuration ---------------------------------------
+# NO tenant-specific values are baked into this package. Every field is read
+# from the environment at call time; the placeholders below only document the
+# expected shape. Configure your own resource with:
+#   export IDUN_BASE=https://<your-resource>.services.ai.azure.com
+#   export IDUN_PROJECT=<your-project>
+#   export IDUN_AGENT=<your-agent>
+#   export IDUN_TENANT=<your-tenant-guid>   # or "organizations" / "common"
+FOUNDRY_BASE_PLACEHOLDER = "https://<resource>.services.ai.azure.com"
+FOUNDRY_PROJECT_PLACEHOLDER = "<project>"
 FOUNDRY_AGENT_DEFAULT = "NatureLM-Idun-5-MoE"
 FOUNDRY_API_VERSION_DEFAULT = "2025-05-15-preview"
 FOUNDRY_SCOPE = "https://ai.azure.com/.default"
-FOUNDRY_TENANT = "885f01ab-7364-4484-be0a-231d541c9e7f"
+# Multi-tenant endpoint by default: works for any tenant, leaks none.
+FOUNDRY_TENANT_DEFAULT = "organizations"
 TOKEN_FILE = os.path.join(os.path.expanduser("~"), "foundry_token.txt")
+
+
+def foundry_base() -> str:
+    """Foundry resource base URL from IDUN_BASE (no tenant default)."""
+    return (os.environ.get("IDUN_BASE") or "").strip().rstrip("/")
+
+
+def foundry_project() -> str:
+    """Foundry project name from IDUN_PROJECT (no tenant default)."""
+    return (os.environ.get("IDUN_PROJECT") or "").strip()
+
+
+def foundry_agent() -> str:
+    return (os.environ.get("IDUN_AGENT") or FOUNDRY_AGENT_DEFAULT).strip()
+
+
+def foundry_tenant() -> str:
+    """Entra tenant from IDUN_TENANT, else the multi-tenant endpoint."""
+    return (os.environ.get("IDUN_TENANT") or FOUNDRY_TENANT_DEFAULT).strip()
+
+
+# Backwards-compatible aliases (deprecated, no longer tenant-specific).
+FOUNDRY_BASE_DEFAULT = FOUNDRY_BASE_PLACEHOLDER
+FOUNDRY_PROJECT_DEFAULT = FOUNDRY_PROJECT_PLACEHOLDER
+FOUNDRY_TENANT = FOUNDRY_TENANT_DEFAULT
 
 
 @dataclass
@@ -167,10 +200,10 @@ class IdunClient:
     def __init__(
         self,
         token: Optional[str] = None,
-        base: str = FOUNDRY_BASE_DEFAULT,
-        project: str = FOUNDRY_PROJECT_DEFAULT,
-        agent: str = FOUNDRY_AGENT_DEFAULT,
-        api_version: str = FOUNDRY_API_VERSION_DEFAULT,
+        base: Optional[str] = None,
+        project: Optional[str] = None,
+        agent: Optional[str] = None,
+        api_version: Optional[str] = None,
         timeout: int = 600,
         backend: Optional[str] = None,
         hf_token: Optional[str] = None,
@@ -195,13 +228,25 @@ class IdunClient:
         self.openai_token = openai_token if openai_token is not None else _be.load_openai_token()
         self.openai_model = openai_model or os.environ.get("OPENAI_MODEL") or _be.OPENAI_DEFAULT_MODEL
         self.openai_base = openai_base or os.environ.get("OPENAI_BASE") or _be.OPENAI_DEFAULT_BASE
-        # --- azure defaults (unchanged) ---
+        # --- azure config: explicit arg > environment > (no tenant default) ---
         self.token = token or os.environ.get("FOUNDRY_TOKEN")
-        self.base = base.rstrip("/")
-        self.project = project
-        self.agent = agent
-        self.api_version = api_version
+        self.base = (base if base is not None else foundry_base()).rstrip("/")
+        self.project = project if project is not None else foundry_project()
+        self.agent = agent if agent is not None else foundry_agent()
+        self.api_version = (api_version if api_version is not None
+                            else os.environ.get("IDUN_API_VERSION")
+                            or FOUNDRY_API_VERSION_DEFAULT)
         self.timeout = timeout
+        # Fail loudly, and only for the azure backend, when unconfigured.
+        if self.backend == "azure" and (not self.base or not self.project):
+            raise ValueError(
+                "Azure Foundry is not configured. Set your own resource:\n"
+                "  export IDUN_BASE=https://<resource>.services.ai.azure.com\n"
+                "  export IDUN_PROJECT=<project>\n"
+                "  export IDUN_AGENT=<agent>            # optional\n"
+                "  export IDUN_TENANT=<tenant-guid>     # optional\n"
+                "Or pass base=/project= explicitly. No tenant is bundled with "
+                "this package.")
 
     def _url(self) -> str:
         return (f"{self.base}/api/projects/{self.project}/agents/{self.agent}"

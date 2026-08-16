@@ -182,7 +182,7 @@ Nostalgia layer, pure ANSI, no dependencies.
 |---|---|
 | Console-script name `idun` is generic and gets hijacked (F1) | doctor check (item 4); consider `idun` → thin dispatcher |
 | Provider model slugs rot (F5) | live model discovery (item 13) |
-| Hardcoded Azure resource in the registry default | move to config; treat the current value as an example only |
+| ~~Hardcoded Azure resource in the registry default~~ | **RESOLVED in v0.2.1**: no tenant ships in the package. `IDUN_BASE`/`IDUN_PROJECT`/`IDUN_AGENT`/`IDUN_TENANT` are read from env; Entra defaults to the multi-tenant `organizations` endpoint; `IdunClient()` raises when unconfigured instead of targeting a foreign resource. 21 guard tests fail the build if any tenant identifier reappears. |
 | API keys in plaintext under `~/.idun` | 0600 today; optional OS keyring later |
 | Rate limits during `race` | backoff (item 8) + cache (item 7) |
 

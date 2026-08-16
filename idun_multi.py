@@ -23,7 +23,7 @@ import sys
 from idun import providers as P
 from idun import retro as R
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 RC_PATH = os.path.join(os.path.expanduser("~"), ".idunrc")
 
 

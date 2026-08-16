@@ -18,12 +18,30 @@ import urllib.parse
 import urllib.request
 from typing import Optional, Tuple
 
-TENANT = "885f01ab-7364-4484-be0a-231d541c9e7f"
+# No tenant is bundled: "organizations" is the multi-tenant Entra endpoint and
+# works for any tenant. Override with IDUN_TENANT=<your-tenant-guid>.
+TENANT_DEFAULT = "organizations"
 SCOPE = "https://ai.azure.com/.default"
 CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"  # Azure CLI first-party app
 TOKEN_FILE = os.path.join(os.path.expanduser("~"), "foundry_token.txt")
 CODE_FILE = os.path.join(os.path.expanduser("~"), "foundry_code.txt")
-AUTH_ENDPOINT = f"https://login.microsoftonline.com/{TENANT}/oauth2/v2.0"
+
+
+def tenant() -> str:
+    """Entra tenant from IDUN_TENANT (or AZURE_TENANT_ID), else multi-tenant."""
+    return (os.environ.get("IDUN_TENANT")
+            or os.environ.get("AZURE_TENANT_ID")
+            or TENANT_DEFAULT).strip()
+
+
+def auth_endpoint() -> str:
+    """OAuth2 v2.0 endpoint for the configured tenant (resolved at call time)."""
+    return f"https://login.microsoftonline.com/{tenant()}/oauth2/v2.0"
+
+
+# Backwards-compatible aliases (no longer tenant-specific).
+TENANT = TENANT_DEFAULT
+AUTH_ENDPOINT = auth_endpoint()
 
 # Refresh the token this many seconds before it actually expires.
 REFRESH_SLACK = 300
@@ -66,7 +84,7 @@ def _load_meta() -> Optional[dict]:
 
 def login() -> str:
     # 1) request device code
-    dc = _post(f"{AUTH_ENDPOINT}/devicecode", {"client_id": CLIENT_ID, "scope": SCOPE})
+    dc = _post(f"{auth_endpoint()}/devicecode", {"client_id": CLIENT_ID, "scope": SCOPE})
     msg = (f"To sign in, use a web browser to open {dc['verification_uri']} "
            f"and enter the code {dc['user_code']} to authenticate.")
     with open(CODE_FILE, "w") as f:
@@ -84,7 +102,7 @@ def login() -> str:
     }
     while time.time() < expires:
         try:
-            tok = _post(f"{AUTH_ENDPOINT}/token", form)
+            tok = _post(f"{auth_endpoint()}/token", form)
             if "access_token" in tok:
                 token = tok["access_token"]
                 _save(token, tok.get("expires_in", 900), tok.get("refresh_token"))
@@ -113,7 +131,7 @@ def _refresh_with(refresh_token: str) -> Optional[Tuple[str, Optional[str]]]:
         "refresh_token": refresh_token,
     }
     try:
-        tok = _post(f"{AUTH_ENDPOINT}/token", form)
+        tok = _post(f"{auth_endpoint()}/token", form)
     except urllib.error.HTTPError:
         return None
     if "access_token" not in tok:
