@@ -170,17 +170,43 @@ stderr so stdout stays clean for piping.
   multi-turn session. Tests: 8 new (registry, base override, message assembly,
   history threading, CLI round-trip). Suite 118 → **138**.
 
+### v0.2.6 — streaming (SSE) + interactive REPL shell
+* **Streaming**: `complete()` gains `stream=True`. The `openai` transport
+  issues a real SSE request (`stream:true`) and yields text deltas as they
+  arrive; all other transports (`anthropic`, `hf`, `azure`) fall back to a
+  single-chunk generator, so callers can always `for chunk in result:` regardless
+  of provider. `_stream_openai` parses the OpenAI `data:`/`[DONE]` event stream
+  and redacts error bodies (same redaction as the non-streaming path).
+* `idun-multi ask --stream` renders tokens incrementally (raw or through the
+  retro header + rule).
+* **REPL**: new `idun-multi shell` — a persistent multi-turn session reusing the
+  v0.2.5 `--resume`/`--save-history` JSON format. Slash commands: `/model`,
+  `/provider`, `/system`, `/save`, `/clear`, `/quit`, `/help`. `--resume <file>`
+  starts from saved history; `--save <file>` persists every turn plus at exit.
+* Tests: 5 new in `tests/test_streaming_repl.py` (SSE chunk parsing, non-openai
+  fallback-to-generator, `ask --stream` wiring, full shell drive with history +
+  model switch + no slash-command leakage). Suite 138 → **143**.
+* Verified: ruff clean, wheel + sdist tenant-free, 143/143 tests green, `v0.2.6`
+  tagged and pushed to PyPI + GitHub (`main` at `faf2802`).
+
 ---
 
 ## 3. Planned — v0.3 (next)
 
-1. **Streaming** (`--stream`): SSE parsing for the openai/anthropic transports,
-   rendered through the retro typewriter for a genuine 16-bit teletype feel.
-2. **Interactive REPL** (`idun-multi shell`): persistent multi-turn session,
-   `/model`, `/provider`, `/system`, `/save`, `/clear` slash commands, history
-   in `~/.idun/history`.
-3. **Retire `backends.py`**: keep a thin shim re-exporting from `providers.py`
-   for one minor version, emit `DeprecationWarning`, then delete.
+1. ~~**Streaming** (`--stream`)~~ — **DONE in v0.2.6**: SSE parsing for the
+   `openai` transport, rendered through the retro typewriter for a genuine
+   16-bit teletype feel. Other transports fall back to a single-chunk
+   generator so `for chunk in complete(..., stream=True)` always works.
+2. ~~**Interactive REPL** (`idun-multi shell`)~~ — **DONE in v0.2.6**:
+   persistent multi-turn session reusing the v0.2.5 resume JSON format;
+   `/model`, `/provider`, `/system`, `/save`, `/clear`, `/quit`, `/help` slash
+   commands; `--resume` / `--save` file persistence.
+3. **Retire `backends.py`** (still open): `backends.py` is still imported by
+   `client.py`, `__init__.py`, `hf_pipeline.py`, `providers.py`, `idun_cli.py`
+   and `tests/test_multi_backend.py`. Plan: route every remaining caller onto
+   `providers.py`, keep a thin shim re-exporting from `providers.py` for one
+   minor version (emit `DeprecationWarning`), then delete both the shim and the
+   test. Not done yet — flagged so it is not quietly dropped.
 4. ~~**Console-script collision guard**~~ — **DONE in v0.2.0**: `idun-multi
    doctor` now reads each installed console script, verifies it imports this
    package, names the hijacking module when it does not, and exits 2. Verified
@@ -247,12 +273,15 @@ stderr so stdout stays clean for piping.
 
 ## 8. Immediate next actions
 
-1. v0.2.0–v0.2.5 are committed, tagged and on PyPI/GitHub (current release: **0.2.5**).
+1. v0.2.0–v0.2.6 are committed, tagged and on PyPI/GitHub (current release: **0.2.6**).
 2. Highest-value next items (unchanged priority):
-   - **Streaming** (item 1) — SSE for openai/anthropic, retro typewriter.
-   - **Interactive REPL** (item 2) — `idun-multi shell`; can reuse the
-     `--resume`/`--save-history` JSON format from v0.2.5 for persistence.
-   - **Retire `backends.py`** (item 3) — thin shim + DeprecationWarning, then delete.
+   - **Retire `backends.py`** (item 3 above) — still imported by 6 modules;
+     route callers onto `providers.py`, ship a deprecation shim, then delete.
+   - **Cost accounting**: per-provider price table, so `race` reports cents
+     per answer next to latency.
+   - **Provider expansion** (registry-only, one line each): Nous Research added
+     in v0.2.5. More OpenAI-compatible endpoints (Perplexity, Fireworks,
+     Novita, Together-style) follow the same pattern — add a `Provider(...)` row.
 3. Then cache/backoff/config-file (v0.4) and MCP parity / async / themes (v0.5).
 4. CI matrix + py.typed + docs + post-install `test.sh` (v1.0) — these are what
    make the package publishable as a serious dependency, not just a personal tool.
