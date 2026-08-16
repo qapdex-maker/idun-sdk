@@ -17,13 +17,14 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import json
 import os
 import sys
 
 from idun import providers as P
 from idun import retro as R
 
-VERSION = "0.2.4"
+VERSION = "0.2.5"
 RC_PATH = os.path.join(os.path.expanduser("~"), ".idunrc")
 
 
@@ -116,22 +117,57 @@ def _render_completion(c: P.Completion, *, raw: bool) -> None:
     print(R.rule())
 
 
+def _load_history(path: str) -> list[dict]:
+    """Read a JSON conversation file into a list of {role, content} dicts.
+
+    Accepts either a bare list of messages or an object with a ``messages``
+    key (the shape ``idun-multi ask --save-history`` writes).
+    """
+    with open(path, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if isinstance(data, dict):
+        data = data.get("messages", [])
+    if not isinstance(data, list):
+        raise ValueError(f"{path}: expected a JSON list or {{'messages': [...]}}")
+    return [m for m in data if isinstance(m, dict) and "role" in m and "content" in m]
+
+
+def _save_history(path: str, history: list[dict]) -> None:
+    with open(path, "w", encoding="utf-8") as fh:
+        json.dump({"messages": history}, fh, ensure_ascii=False, indent=2)
+
+
 def cmd_ask(args) -> int:
     prompt = " ".join(args.prompt).strip()
     if not prompt:
         print(R.status("err", "empty prompt."))
         return 2
     pid = _active(args)
-    if not args.raw:
-        print(R.status("info", f"asking {R.paint(pid, 'accent')} ..."))
+
+    history = _load_history(args.resume) if args.resume else None
+    if not args.raw and history is not None:
+        print(R.status("info",
+              f"resuming {R.paint(pid, 'accent')} · {len(history)} prior turns"))
+
     try:
         c = P.complete(pid, prompt, model=args.model, system=args.system or "",
                        temperature=args.temperature, max_tokens=args.max_tokens,
-                       timeout=args.timeout)
+                       timeout=args.timeout, history=history)
     except (RuntimeError, ValueError) as e:
         print(R.status("err", str(e)))
         return 1
+
     _render_completion(c, raw=args.raw)
+
+    # build the cumulative transcript and optionally persist it
+    if args.save_history or args.resume:
+        transcript = list(history or [])
+        transcript.append({"role": "user", "content": prompt})
+        transcript.append({"role": "assistant", "content": c.text})
+        out = args.save_history or args.resume
+        _save_history(out, transcript)
+        if not args.raw:
+            print(R.status("info", f"history saved -> {out}"))
     return 0
 
 
@@ -372,7 +408,13 @@ def build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("ask", help="send one prompt")
     sp.add_argument("prompt", nargs="+")
     sp.add_argument("--model", default="")
-    sp.add_argument("--system", default="")
+    sp.add_argument("--system", default="",
+                    help="system prompt (prepended to the conversation)")
+    sp.add_argument("--resume", default="",
+                    help="resume a saved conversation from this JSON file")
+    sp.add_argument("--save-history", default="",
+                    help="after answering, append this turn and write the "
+                         "full transcript to this JSON file")
     sp.add_argument("--temperature", type=float, default=0.7)
     sp.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
     sp.add_argument("--timeout", type=int, default=120)

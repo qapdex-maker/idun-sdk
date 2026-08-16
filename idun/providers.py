@@ -196,6 +196,17 @@ REGISTRY: tuple[Provider, ...] = (
         models=("grok-3", "grok-3-mini"),
     ),
     Provider(
+        id="nous",
+        label="Nous Research (Hermes)",
+        base="https://api.nousresearch.com/v1",
+        default_model="hermes-4-70b",
+        env_keys=("NOUS_API_KEY",),
+        models=("hermes-4-70b", "hermes-4-405b", "hermes-3-llama-3.1-405b",
+                "hermes-3-llama-3.1-8b", "deephermes-3-mistral-24b-preview"),
+        notes="OpenAI-compatible chat/completions; key from portal.nousresearch.com. "
+               "Free tier: hermes-3-llama-3.1-8b, deephermes-3-mistral-24b-preview.",
+    ),
+    Provider(
         id="hf",
         label="Hugging Face Inference",
         base="https://api-inference.huggingface.co/models",
@@ -355,11 +366,9 @@ def _post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
 
 def _call_openai(p: Provider, prompt: str, model: str, token: str, *,
                  system: str = "", temperature: float = 0.7,
-                 max_tokens: int = 1024, timeout: int = 120) -> dict:
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
+                 max_tokens: int = 1024, timeout: int = 120,
+                 history: list[dict] | None = None) -> dict:
+    messages = _build_messages(system, prompt, history)
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -371,15 +380,16 @@ def _call_openai(p: Provider, prompt: str, model: str, token: str, *,
 
 def _call_anthropic(p: Provider, prompt: str, model: str, token: str, *,
                     system: str = "", temperature: float = 0.7,
-                    max_tokens: int = 1024, timeout: int = 120) -> dict:
+                    max_tokens: int = 1024, timeout: int = 120,
+                    history: list[dict] | None = None) -> dict:
     headers = {
         "Content-Type": "application/json",
         "x-api-key": token,
         "anthropic-version": "2023-06-01",
     }
+    messages = _build_messages(system, prompt, history, drop_system=True)
     body = {"model": model, "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}]}
+            "temperature": temperature, "messages": messages}
     if system:
         body["system"] = system
     return _post_json(f"{p.resolved_base().rstrip('/')}/messages",
@@ -388,7 +398,8 @@ def _call_anthropic(p: Provider, prompt: str, model: str, token: str, *,
 
 def _call_hf(p: Provider, prompt: str, model: str, token: str, *,
              system: str = "", temperature: float = 0.7,
-             max_tokens: int = 1024, timeout: int = 120) -> dict:
+             max_tokens: int = 1024, timeout: int = 120,
+             history: list[dict] | None = None) -> dict:
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -404,6 +415,32 @@ def _call_hf(p: Provider, prompt: str, model: str, token: str, *,
                            "return_full_text": False}}
     return _post_json(f"{p.resolved_base().rstrip('/')}/{model}",
                       body, headers, timeout)
+
+
+def _build_messages(system: str, prompt: str,
+                    history: list[dict] | None,
+                    drop_system: bool = False) -> list[dict]:
+    """Assemble the message list from (optional) system + history + new user turn.
+
+    ``history`` is a list of ``{"role": ..., "content": ...}`` dicts exactly as
+    returned by an OpenAI-style API, so a prior conversation can be resumed by
+    passing the stored ``messages`` back in. The new user ``prompt`` is always
+    appended last. When ``drop_system`` is set (Anthropic) the system turn is
+    omitted here because the caller passes it as a top-level field instead.
+    """
+    messages: list[dict] = []
+    if system and not drop_system:
+        messages.append({"role": "system", "content": system})
+    if history:
+        for m in history:
+            if isinstance(m, dict) and "role" in m and "content" in m:
+                role = m["role"]
+                # normalize roles the providers understand
+                if role not in ("system", "user", "assistant"):
+                    role = "user"
+                messages.append({"role": role, "content": m["content"]})
+    messages.append({"role": "user", "content": prompt})
+    return messages
 
 
 def _extract_text(transport: str, data: object) -> str:
@@ -449,8 +486,11 @@ _TRANSPORTS = {
 
 def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
              temperature: float = 0.7, max_tokens: int = 1024,
-             timeout: int = 120) -> Completion:
+             timeout: int = 120, history: list[dict] | None = None) -> Completion:
     """Send one prompt to a provider and return a normalized Completion.
+
+    ``history`` is an optional list of prior ``{"role", "content"}`` turns; when
+    given the conversation is resumed instead of starting fresh.
 
     Raises RuntimeError on missing credentials or transport failure.
     """
@@ -477,7 +517,7 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
     started = time.time()
     data = caller(p, prompt, model, token, system=system,
                   temperature=temperature, max_tokens=max_tokens,
-                  timeout=timeout)
+                  timeout=timeout, history=history)
     latency = int((time.time() - started) * 1000)
     ptok, ctok = _extract_usage(p.transport, data)
     return Completion(
