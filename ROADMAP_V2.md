@@ -158,10 +158,17 @@ The legacy `idun` CLI (Azure-Foundry-first) rendered plain text; only
 status / wizard / token / hf / packs / run / diff / export. Output goes to
 stderr so stdout stays clean for piping.
 
-### Test growth
-* v0.2.0: 74 tests. Now **118** (27 tenant-leak + credential/SSRF guards, 4
-  CLI backend-choice, 6 retro-UI, plus the security-regression cases).
-* ruff clean, bandit 0 High, pip-audit 0 CVEs, Python 3.8 claim verified.
+### v0.2.5 — Nous provider + conversation resume
+* **Nous Research (Hermes)** added as an OpenAI-compatible provider
+  (`api.nousresearch.com/v1`, env `NOUS_API_KEY`, `IDUN_NOUS_BASE` override).
+  Ships `hermes-4-70b` plus free-tier `hermes-3-llama-3.1-8b` and
+  `deephermes-3-mistral-24b-preview`.
+* **Resume**: `complete()` accepts a `history` list of `{role, content}`
+  turns; OpenAI/Anthropic transports thread it into the message list. `idun-multi
+  ask` gains `--resume <file>` (load) and `--save-history <file>` (persist the
+  cumulative transcript as JSON) — same path for both gives a continuous
+  multi-turn session. Tests: 8 new (registry, base override, message assembly,
+  history threading, CLI round-trip). Suite 118 → **138**.
 
 ---
 
@@ -180,6 +187,9 @@ stderr so stdout stays clean for piping.
    against a simulated `llamacpp_vulkan` hijack; 2 regression tests added.
 5. **Cost accounting**: per-provider price table, so `race` reports cents per
    answer next to latency.
+6. **Provider expansion** (registry-only, one line each): Nous Research added
+   in v0.2.5. More OpenAI-compatible endpoints (Perplexity, Fireworks,
+   Novita, Together-style) follow the same pattern — add a `Provider(...)` row.
 
 ## 4. Planned — v0.4
 
