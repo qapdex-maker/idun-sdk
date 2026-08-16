@@ -35,7 +35,8 @@ BANNER = r"""
 
 def _add_backend_arg(p):
     p.add_argument("--backend", choices=["azure", "hf", "github", "openai"],
-                   default="azure", help="completion backend (default: azure)")
+                   default=None,
+                   help="completion backend (default: $IDUN_BACKEND or azure)")
 
 
 def _add_common_args(p):
@@ -45,7 +46,9 @@ def _add_common_args(p):
                    help="use the asyncio variant (no extra deps)")
 
 
-def _client(backend: str = "azure") -> IdunClient:
+def _client(backend: str | None = None) -> IdunClient:
+    backend = backend or os.environ.get("IDUN_BACKEND") \
+        or os.environ.get("IDUN_PROVIDER") or "azure"
     if backend == "azure":
         tok = load_token() or os.environ.get("FOUNDRY_TOKEN")
         if not tok:
@@ -57,7 +60,7 @@ def _client(backend: str = "azure") -> IdunClient:
 
 def _run(args, prompt) -> IdunResult:
     """Sync or async completion based on args.async flag (default sync)."""
-    c = _client(getattr(args, "backend", "azure"))
+    c = _client(getattr(args, "backend", None))
     if getattr(args, "async_", False):
         import asyncio
         return asyncio.run(c.complete_async(prompt, max_output_tokens=args.max_tokens))
@@ -66,7 +69,8 @@ def _run(args, prompt) -> IdunResult:
 
 def cmd_login(args):
     print(BANNER)
-    backend = getattr(args, "backend", "azure")
+    backend = getattr(args, "backend", None) or os.environ.get("IDUN_BACKEND") \
+        or os.environ.get("IDUN_PROVIDER") or "azure"
     if backend == "azure":
         do_login()
         return
