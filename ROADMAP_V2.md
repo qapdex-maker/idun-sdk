@@ -118,6 +118,53 @@ Nostalgia layer, pure ANSI, no dependencies.
 
 ---
 
+## 2b. Shipped since v0.2.0 (v0.2.1 → v0.2.4)
+
+### v0.2.1 — tenant configuration removed (security)
+* **No Azure tenant/resource/agent ships in the package any more.** `IDUN_BASE`,
+  `IDUN_PROJECT`, `IDUN_AGENT`, `IDUN_TENANT`, `IDUN_API_VERSION` are read from
+  the environment. `IdunClient()` raises a clear `ValueError` when the azure
+  backend is unconfigured instead of silently pointing at a foreign resource.
+* `auth.tenant()` defaults to the multi-tenant `"organizations"` endpoint; the
+  OAuth endpoint is resolved per call, not frozen at import time.
+* Author email changed to `qapdex@gmail.com` (neutral, non-tenant identity).
+* Verified by reintroducing the leak (tests fail) and by scanning the built
+  wheel + sdist + a fresh PyPI install — all clean.
+
+### v0.2.2 — external-audit remediation
+Independent LLM review (nvidia/nemotron-3-ultra-550b via OpenRouter) plus local
+ruff/bandit/pip-audit/vermin:
+* Token files now created atomically with mode `0o600` via
+  `os.open(O_CREAT|O_EXCL)` — removes the umask window where a credential sat
+  on disk as `0644` before `chmod`. Partial writes on failure leave no stray
+  `.token` file.
+* Provider 4xx/5xx error bodies are redacted (Bearer / `api_key=` / `token=` /
+  `pypi-` tokens) before they reach exception messages or logs.
+* Hugging Face transport now prepends the system prompt (the HF Inference API
+  has no system-message field).
+* `--token` CLI flag removed from `login`/`ask`; keys only via `getpass` (no
+  more process-table / shell-history leaks).
+* Dropped the unused `Provider.caller` field.
+
+### v0.2.3 — CLI backend resolution
+`idun chat` / `idun login` without `--backend` now honor `IDUN_BACKEND` /
+`IDUN_PROVIDER` from `~/.idunrc` instead of always forcing the azure/Foundry
+login. An explicit `--backend` still wins.
+
+### v0.2.4 — unified retro UI
+The legacy `idun` CLI (Azure-Foundry-first) rendered plain text; only
+`idun-multi` had the 16-bit chrome. Added `idun/_cli_retro.py` and routed every
+`idun` command through the shared `idun.retro` helpers: login / chat / trace /
+status / wizard / token / hf / packs / run / diff / export. Output goes to
+stderr so stdout stays clean for piping.
+
+### Test growth
+* v0.2.0: 74 tests. Now **118** (27 tenant-leak + credential/SSRF guards, 4
+  CLI backend-choice, 6 retro-UI, plus the security-regression cases).
+* ruff clean, bandit 0 High, pip-audit 0 CVEs, Python 3.8 claim verified.
+
+---
+
 ## 3. Planned — v0.3 (next)
 
 1. **Streaming** (`--stream`): SSE parsing for the openai/anthropic transports,
@@ -183,12 +230,18 @@ Nostalgia layer, pure ANSI, no dependencies.
 | Console-script name `idun` is generic and gets hijacked (F1) | doctor check (item 4); consider `idun` → thin dispatcher |
 | Provider model slugs rot (F5) | live model discovery (item 13) |
 | ~~Hardcoded Azure resource in the registry default~~ | **RESOLVED in v0.2.1**: no tenant ships in the package. `IDUN_BASE`/`IDUN_PROJECT`/`IDUN_AGENT`/`IDUN_TENANT` are read from env; Entra defaults to the multi-tenant `organizations` endpoint; `IdunClient()` raises when unconfigured instead of targeting a foreign resource. 21 guard tests fail the build if any tenant identifier reappears. |
-| API keys in plaintext under `~/.idun` | 0600 today; optional OS keyring later |
+| API keys in plaintext under `~/.idun` | 0600 today (atomic in v0.2.2); optional OS keyring later |
+| ~~API key leaks via `--token` in argv / process table~~ | **RESOLVED in v0.2.2**: `--token` flag removed, `getpass` only |
 | Rate limits during `race` | backoff (item 8) + cache (item 7) |
+| Secrets in provider error bodies | **RESOLVED in v0.2.2**: redaction before logging (item 19 effectively done) |
 
 ## 8. Immediate next actions
 
-1. Commit v0.2.0 (registry + retro + `idun-multi` + 27 tests).
-2. Implement the doctor collision guard (item 4) — it is the highest-value
-   item, since it catches the exact bug that started this rework.
-3. Then streaming (item 1) and the REPL (item 2).
+1. v0.2.0–v0.2.4 are committed, tagged and on PyPI/GitHub.
+2. Highest-value next items (unchanged priority):
+   - **Streaming** (item 1) — SSE for openai/anthropic, retro typewriter.
+   - **Interactive REPL** (item 2) — `idun-multi shell`.
+   - **Retire `backends.py`** (item 3) — thin shim + DeprecationWarning, then delete.
+3. Then cache/backoff/config-file (v0.4) and MCP parity / async / themes (v0.5).
+4. CI matrix + py.typed + docs + post-install `test.sh` (v1.0) — these are what
+   make the package publishable as a serious dependency, not just a personal tool.
