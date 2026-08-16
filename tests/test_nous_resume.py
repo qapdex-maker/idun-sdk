@@ -84,7 +84,7 @@ def test_cli_ask_resume_and_save(tmp_path, monkeypatch, capsys):
     args = type("A", (), {
         "prompt": ["hello"], "provider": "nous", "model": "", "system": "",
         "temperature": 0.7, "max_tokens": 1024, "timeout": 120,
-        "resume": "", "save_history": str(path), "raw": True})()
+        "resume": "", "save_history": str(path), "raw": True, "stream": False})()
     assert M.cmd_ask(args) == 0
     saved = json.loads(path.read_text())
     assert saved["messages"][0]["role"] == "user"
@@ -100,7 +100,7 @@ def test_cli_ask_resume_and_save(tmp_path, monkeypatch, capsys):
     args2 = type("A", (), {
         "prompt": ["follow up"], "provider": "nous", "model": "", "system": "",
         "temperature": 0.7, "max_tokens": 1024, "timeout": 120,
-        "resume": str(path), "save_history": "", "raw": True})()
+        "resume": str(path), "save_history": "", "raw": True, "stream": False})()
     assert M.cmd_ask(args2) == 0
     # history was threaded back in: prior user + prior assistant
     assert seen["history"][0]["content"] == "hello"

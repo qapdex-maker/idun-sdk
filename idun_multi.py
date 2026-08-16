@@ -24,7 +24,7 @@ import sys
 from idun import providers as P
 from idun import retro as R
 
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 RC_PATH = os.path.join(os.path.expanduser("~"), ".idunrc")
 
 
@@ -150,20 +150,48 @@ def cmd_ask(args) -> int:
               f"resuming {R.paint(pid, 'accent')} · {len(history)} prior turns"))
 
     try:
-        c = P.complete(pid, prompt, model=args.model, system=args.system or "",
-                       temperature=args.temperature, max_tokens=args.max_tokens,
-                       timeout=args.timeout, history=history)
+        result = P.complete(pid, prompt, model=args.model, system=args.system or "",
+                            temperature=args.temperature, max_tokens=args.max_tokens,
+                            timeout=args.timeout, history=history,
+                            stream=args.stream)
     except (RuntimeError, ValueError) as e:
         print(R.status("err", str(e)))
         return 1
 
-    _render_completion(c, raw=args.raw)
+    # streaming returns a generator of text chunks; non-streaming a Completion
+    if args.stream:
+        chunks = result  # generator[str]
+        if not args.raw:
+            print(R.header("IDUN RESPONSE (stream)",
+                           f"{pid} · {args.model or '(default)'}"))
+            print()
+        full = []
+        try:
+            for chunk in chunks:
+                full.append(chunk)
+                if args.raw:
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+                else:
+                    # incremental, no clear-screen: append in place
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+        except (RuntimeError, ValueError) as e:
+            print(R.status("err", str(e)))
+            return 1
+        text = "".join(full)
+        if not args.raw:
+            print()
+            print(R.rule())
+    else:
+        _render_completion(result, raw=args.raw)
+        text = result.text
 
     # build the cumulative transcript and optionally persist it
     if args.save_history or args.resume:
         transcript = list(history or [])
         transcript.append({"role": "user", "content": prompt})
-        transcript.append({"role": "assistant", "content": c.text})
+        transcript.append({"role": "assistant", "content": text})
         out = args.save_history or args.resume
         _save_history(out, transcript)
         if not args.raw:
@@ -369,6 +397,124 @@ def cmd_wizard(args) -> int:
     return 0
 
 
+def cmd_shell(args) -> int:
+    """Interactive multi-turn REPL.
+
+    Reads prompts from stdin (one per line), threads the running conversation
+    through ``complete(history=...)``, and persists the full transcript to a
+    JSON file when ``--save`` is given (the same format ``ask --resume``
+    reads, so the two are interchangeable). Slash commands:
+
+        /model <id>      switch model
+        /provider <id>   switch provider
+        /system <text>   set the system prompt
+        /save [path]     persist the transcript now
+        /clear           drop the in-memory history
+        /quit            leave the shell
+    """
+    pid = _active(args)
+    model = args.model or ""
+    system = args.system or ""
+    history: list[dict] = []
+    save_path = args.save
+
+    if args.resume:
+        history = _load_history(args.resume)
+        print(R.status("info",
+              f"resumed {len(history)} turns from {args.resume}"))
+
+    print(R.logo(VERSION))
+    print(R.header("IDUN SHELL", f"{pid} · {model or 'default'}"))
+    print(R.status("info",
+          "type a prompt, or /help for commands. Ctrl-D exits."))
+    print()
+
+    while True:
+        try:
+            line = input(R.paint(f"{pid}> ", "accent", "bold")).rstrip("\n")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+        if not line:
+            continue
+        if line.startswith("/"):
+            cmd, _, rest = line[1:].partition(" ")
+            rest = rest.strip()
+            if cmd in ("quit", "exit"):
+                break
+            if cmd == "help":
+                print(R.box([
+                    "/model <id>      switch model",
+                    "/provider <id>   switch provider",
+                    "/system <text>   set system prompt",
+                    "/save [path]     persist transcript",
+                    "/clear           drop history",
+                    "/quit            exit",
+                ], title="SHELL COMMANDS"))
+                continue
+            if cmd == "model":
+                model = rest
+                print(R.status("ok", f"model -> {model or 'default'}"))
+                continue
+            if cmd == "provider":
+                pid = rest or pid
+                print(R.status("ok", f"provider -> {pid}"))
+                continue
+            if cmd == "system":
+                system = rest
+                print(R.status("ok", f"system -> {system or '(none)'}"))
+                continue
+            if cmd == "clear":
+                history = []
+                print(R.status("ok", "history cleared"))
+                continue
+            if cmd == "save":
+                if rest:
+                    save_path = rest
+                if not save_path:
+                    print(R.status("err", "no save path (use /save <file>)"))
+                    continue
+                _save_history(save_path, history)
+                print(R.status("ok", f"saved -> {save_path}"))
+                continue
+            print(R.status("err", f"unknown command /{cmd}"))
+            continue
+
+        # normal prompt
+        try:
+            result = P.complete(pid, line, model=model, system=system,
+                                history=history, stream=args.stream)
+        except (RuntimeError, ValueError) as e:
+            print(R.status("err", str(e)))
+            continue
+
+        if args.stream:
+            full = []
+            try:
+                for chunk in result:
+                    full.append(chunk)
+                    sys.stdout.write(chunk)
+                    sys.stdout.flush()
+            except (RuntimeError, ValueError) as e:
+                print(R.status("err", str(e)))
+                continue
+            text = "".join(full)
+            print()
+        else:
+            text = result.text
+            _render_completion(result, raw=False)
+
+        history.append({"role": "user", "content": line})
+        history.append({"role": "assistant", "content": text})
+        if save_path:
+            _save_history(save_path, history)
+
+    if save_path and history:
+        _save_history(save_path, history)
+        print(R.status("info", f"session saved -> {save_path}"))
+    return 0
+
+
 def cmd_banner(_args) -> int:
     print(R.logo(VERSION))
     print()
@@ -418,8 +564,23 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--temperature", type=float, default=0.7)
     sp.add_argument("--max-tokens", type=int, default=1024, dest="max_tokens")
     sp.add_argument("--timeout", type=int, default=120)
+    sp.add_argument("--stream", action="store_true",
+                    help="stream tokens as they arrive (openai transport)")
     sp.add_argument("--raw", action="store_true", help="plain text, no chrome")
     sp.set_defaults(func=cmd_ask)
+
+    sp = sub.add_parser("shell", help="interactive multi-turn REPL")
+    sp.add_argument("--model", default="")
+    sp.add_argument("--system", default="",
+                    help="system prompt for the whole session")
+    sp.add_argument("--resume", default="",
+                    help="start the shell from a saved transcript JSON")
+    sp.add_argument("--save", default="",
+                    help="persist the session transcript to this JSON file")
+    sp.add_argument("--stream", action="store_true",
+                    help="stream tokens as they arrive (openai transport)")
+    sp.add_argument("--timeout", type=int, default=120)
+    sp.set_defaults(func=cmd_shell)
 
     sp = sub.add_parser("race", help="compare providers on one prompt")
     sp.add_argument("prompt", nargs="+")

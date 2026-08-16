@@ -378,6 +378,65 @@ def _call_openai(p: Provider, prompt: str, model: str, token: str, *,
                       body, headers, timeout)
 
 
+def _stream_openai(p: Provider, model: str, token: str, messages: list[dict],
+                   temperature: float, max_tokens: int, timeout: int):
+    """Stream a chat completion over SSE, yielding text deltas.
+
+    Yields ``str`` chunks as they arrive; on transport failure raises
+    RuntimeError. Parses the OpenAI ``data: {json}`` event stream and stops at
+    the ``[DONE]`` sentinel. Insecure (non-http(s)) bases are rejected by
+    ``_require_http_url`` before any connection is made.
+    """
+    url = f"{p.resolved_base().rstrip('/')}/chat/completions"
+    _require_http_url(url)
+    headers = {"Content-Type": "application/json",
+               "Accept": "text/event-stream"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    body = {"model": model, "messages": messages,
+            "max_tokens": max_tokens, "temperature": temperature,
+            "stream": True}
+    req = urllib.request.Request(url, data=json.dumps(body).encode("utf-8"),
+                                  headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            buf = ""
+            while True:
+                chunk = resp.read(1)
+                if not chunk:
+                    break
+                buf += chunk.decode("utf-8", "replace")
+                # SSE frames are separated by a blank line
+                while "\n\n" in buf:
+                    frame, buf = buf.split("\n\n", 1)
+                    for line in frame.splitlines():
+                        line = line.strip()
+                        if not line.startswith("data:"):
+                            continue
+                        payload = line[len("data:"):].strip()
+                        if payload == "[DONE]":
+                            return
+                        try:
+                            obj = json.loads(payload)
+                        except json.JSONDecodeError:
+                            continue
+                        if obj.get("error"):
+                            raise RuntimeError(
+                                f"stream error: {obj['error']}")
+                        try:
+                            delta = obj["choices"][0]["delta"]["content"] or ""
+                        except (KeyError, IndexError, TypeError):
+                            delta = ""
+                        if delta:
+                            yield delta
+    except urllib.error.HTTPError as e:
+        detail = _sanitize_error_body(
+            e.read().decode("utf-8", "replace")[:400])
+        raise RuntimeError(f"HTTP {e.code} from {url}: {detail}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"cannot reach {url}: {e.reason}") from e
+
+
 def _call_anthropic(p: Provider, prompt: str, model: str, token: str, *,
                     system: str = "", temperature: float = 0.7,
                     max_tokens: int = 1024, timeout: int = 120,
@@ -486,11 +545,18 @@ _TRANSPORTS = {
 
 def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
              temperature: float = 0.7, max_tokens: int = 1024,
-             timeout: int = 120, history: list[dict] | None = None) -> Completion:
+             timeout: int = 120, history: list[dict] | None = None,
+             stream: bool = False):
     """Send one prompt to a provider and return a normalized Completion.
 
     ``history`` is an optional list of prior ``{"role", "content"}`` turns; when
     given the conversation is resumed instead of starting fresh.
+
+    With ``stream=True`` the function returns a generator instead of a
+    Completion: it yields text chunks (``str``) as they arrive over SSE. Only
+    the ``openai`` transport supports streaming today; every other transport
+    falls back to a single-chunk yield of the full response so callers can rely
+    on the same interface.
 
     Raises RuntimeError on missing credentials or transport failure.
     """
@@ -507,8 +573,18 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
         # Azure Foundry keeps its own client (tool-agent trace, Entra auth).
         from idun.client import IdunClient  # local import: heavier deps
         res = IdunClient().complete(prompt, max_output_tokens=max_tokens)
-        return Completion(text=res.text, model=model, provider=p.id,
+        text = res.text
+        if stream:
+            def _one():
+                yield text
+            return _one()
+        return Completion(text=text, model=model, provider=p.id,
                           raw={"steps": len(getattr(res, "steps", []))})
+
+    if stream and p.transport == "openai":
+        messages = _build_messages(system, prompt, history)
+        return _stream_openai(p, model, token, messages, temperature,
+                               max_tokens, timeout)
 
     caller = _TRANSPORTS.get(p.transport)
     if caller is None:
@@ -520,12 +596,19 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
                   timeout=timeout, history=history)
     latency = int((time.time() - started) * 1000)
     ptok, ctok = _extract_usage(p.transport, data)
-    return Completion(
+    completion = Completion(
         text=_extract_text(p.transport, data).strip(),
         model=model, provider=p.id, prompt_tokens=ptok,
         completion_tokens=ctok, latency_ms=latency,
         raw=data if isinstance(data, dict) else {},
     )
+    if not stream:
+        return completion
+    # non-streaming transports: expose the same generator interface so callers
+    # can always iterate regardless of which provider answered.
+    def _single():
+        yield completion.text
+    return _single()
 
 
 def default_provider() -> str:
