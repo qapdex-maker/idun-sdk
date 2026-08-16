@@ -10,14 +10,72 @@
   <img src="https://raw.githubusercontent.com/qapdex-maker/idun-sdk/main/idun/data/foundry_logo_color.svg" width="104" height="110" alt="Azure AI Foundry logo"/>
 </p>
 
-**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — with a pluggable multi-backend layer.**
+**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 13-provider registry and a 16-bit retro console.**
 
 Runs headless on Termux/Android with nothing but the Python standard library
 (no `httpx`, no `azure-identity`, no Flask). Idun is a **tool agent** (reasons +
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 (reasoning + tool calls) instead of a black-box answer.
 
-## Multi-backend
+## Multi-provider (v0.2.0)
+
+Since v0.2.0 the SDK ships a **declarative provider registry** covering 13
+providers over 3 transports, plus `idun-multi`: a 16-bit retro console.
+
+```bash
+idun-multi providers                    # all 13 providers + credential state
+idun-multi login --provider groq        # hidden prompt -> ~/.idun/groq.token (0600)
+idun-multi ask "explain MoE routing"    # active provider
+idun-multi -p openrouter ask "hi"       # one-off provider
+idun-multi race "Name one planet."      # fan one prompt at every ready provider
+idun-multi doctor                       # env + credential + console-script audit
+```
+
+| Provider | Transport | Credential | Tier |
+|---|---|---|---|
+| `azure` | Foundry responses | Entra device-code (`idun login`) | paid |
+| `openai` | openai | `OPENAI_API_KEY` | paid |
+| `anthropic` | anthropic messages | `ANTHROPIC_API_KEY` | paid |
+| `groq` | openai | `GROQ_API_KEY` | free tier |
+| `openrouter` | openai | `OPENROUTER_API_KEY` | free tier |
+| `together` | openai | `TOGETHER_API_KEY` | paid |
+| `deepseek` | openai | `DEEPSEEK_API_KEY` | paid |
+| `mistral` | openai | `MISTRAL_API_KEY` | paid |
+| `gemini` | openai | `GEMINI_API_KEY` | free tier |
+| `xai` | openai | `XAI_API_KEY` | paid |
+| `hf` | hf inference | `HF_TOKEN` (optional) | free |
+| `ollama` | openai | none (local) | free |
+| `local` | openai | none | free |
+
+**Any OpenAI-compatible endpoint works without code changes** — override per
+provider with `IDUN_<ID>_BASE` and `IDUN_<ID>_MODEL`:
+
+```bash
+export IDUN_LOCAL_BASE=http://127.0.0.1:8080/v1   # llama.cpp / vLLM / LiteLLM
+idun-multi -p local ask "hello"
+```
+
+Python API:
+
+```python
+from idun import complete, list_providers
+
+c = complete("groq", "Summarise MoE routing in one line.")
+print(c.text, c.model, c.latency_ms, c.total_tokens)
+```
+
+Credentials resolve from the provider env keys first, then
+`~/.idun/<id>.token` (file 0600, dir 0700). Keys are never echoed and never
+passed via argv.
+
+### Retro UI
+
+The 16-colour ANSI chrome degrades cleanly: `NO_COLOR=1` or `IDUN_NO_RETRO=1`
+disables colour, `IDUN_ASCII=1` swaps box-drawing for pure ASCII,
+`IDUN_FORCE_COLOR=1` keeps colour through a pipe, `IDUN_NO_TYPEWRITER=1`
+prints answers instantly.
+
+## Multi-backend (legacy, pre-0.2)
 
 The same `IdunClient` API dispatches to three interchangeable backends. Non-Azure
 backends need no `FOUNDRY_TOKEN`, so the SDK keeps working even when the Azure

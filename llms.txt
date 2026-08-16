@@ -6,6 +6,39 @@
 > Multi-backend (v0.1.31+): same IdunClient API dispatches to
 > azure (default), hf (Hugging Face), github (GitHub Models), openai (OpenAI-compatible).
 > Non-Azure backends need no FOUNDRY_TOKEN.
+> Multi-provider (v0.2.0+): declarative registry of 13 providers over 3
+> transports, exposed as the `idun-multi` CLI with 16-colour retro ANSI UI.
+
+## Multi-provider registry (v0.2.0)
+
+- providers: azure, openai, anthropic, groq, openrouter, together, deepseek,
+  mistral, gemini, xai, hf, ollama, local
+- transports: `openai` (/v1/chat/completions dialect, 10 providers),
+  `anthropic` (native /messages), `hf` (Inference API), `azure` (tool-agent)
+- API: `from idun import complete, list_providers, get_provider`
+  - `complete(provider_id, prompt, model=..., system=..., temperature=...,
+    max_tokens=..., timeout=...) -> Completion`
+  - `Completion(text, model, provider, prompt_tokens, completion_tokens,
+    latency_ms, total_tokens, raw)`
+- credentials: provider env key first, then `~/.idun/<id>.token` (0600).
+  Never echoed, never passed via argv.
+- per-provider overrides: `IDUN_<ID>_MODEL`, `IDUN_<ID>_BASE` — point `local`
+  or `openai` at any OpenAI-compatible server (llama.cpp, vLLM, LiteLLM).
+- active provider: `IDUN_PROVIDER` (legacy `IDUN_BACKEND` still honoured).
+
+## idun-multi CLI
+
+- `idun-multi providers` — all providers + model + credential state
+- `idun-multi models [-p ID]` — known models, base URL, auth for one provider
+- `idun-multi login --provider ID` — hidden prompt, stores 0600 token
+- `idun-multi ask "<prompt>" [-p ID] [--model M] [--system S] [--raw]`
+- `idun-multi race "<prompt>" [--providers a,b,c]` — parallel fan-out,
+  latency/token comparison table
+- `idun-multi doctor` — env + credential audit AND console-script hijack
+  check (exit 2 when `idun` does not resolve to this package)
+- `idun-multi wizard` — interactive setup, TTY-safe (no crash under a pipe)
+- retro env flags: `NO_COLOR`, `IDUN_NO_RETRO`, `IDUN_ASCII`,
+  `IDUN_FORCE_COLOR`, `IDUN_NO_TYPEWRITER`
 
 ## Documentation
 

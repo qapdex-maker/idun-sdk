@@ -58,7 +58,7 @@ VERSION = _read_version()
 setup(
     name="idun-sdk",
     version=VERSION,
-    description="Thin client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE (multi-backend: azure/hf/github)",
+    description="Stdlib-only client + CLI for Azure AI Foundry agent NatureLM-Idun-5-MoE, with a 13-provider registry (openai/anthropic/groq/openrouter/gemini/...) and a 16-bit retro console",
     long_description=LONG_DESCRIPTION,
     long_description_content_type="text/markdown",
     author="Idun",
