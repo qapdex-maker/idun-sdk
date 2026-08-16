@@ -62,8 +62,8 @@ it. Now aliased onto the `openai` transport.
 A declarative registry replaces the hand-wired backends. Adding a provider is
 now a single `Provider(...)` entry.
 
-* **13 providers**: azure, openai, anthropic, groq, openrouter, together,
-  deepseek, mistral, gemini, xai, hf, ollama, local
+* **13 providers** (now 14 with Nous in v0.2.5): azure, openai, anthropic, groq, openrouter, together,
+  deepseek, mistral, gemini, xai, hf, ollama, local, nous
 * **3 transports** cover all of them: `openai` (the /v1/chat/completions
   dialect, 10 providers), `anthropic` (native messages API), `hf`
   (Inference API), plus `azure` delegating to the existing tool-agent client
@@ -247,10 +247,11 @@ stderr so stdout stays clean for piping.
 
 ## 8. Immediate next actions
 
-1. v0.2.0–v0.2.4 are committed, tagged and on PyPI/GitHub.
+1. v0.2.0–v0.2.5 are committed, tagged and on PyPI/GitHub (current release: **0.2.5**).
 2. Highest-value next items (unchanged priority):
    - **Streaming** (item 1) — SSE for openai/anthropic, retro typewriter.
-   - **Interactive REPL** (item 2) — `idun-multi shell`.
+   - **Interactive REPL** (item 2) — `idun-multi shell`; can reuse the
+     `--resume`/`--save-history` JSON format from v0.2.5 for persistence.
    - **Retire `backends.py`** (item 3) — thin shim + DeprecationWarning, then delete.
 3. Then cache/backoff/config-file (v0.4) and MCP parity / async / themes (v0.5).
 4. CI matrix + py.typed + docs + post-install `test.sh` (v1.0) — these are what
