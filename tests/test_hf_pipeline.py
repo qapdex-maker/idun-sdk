@@ -101,4 +101,4 @@ def test_cli_hf_whoami_missing_token(monkeypatch, capsys):
     args = idun_cli.build_parser().parse_args(["hf", "whoami"])
     rc = idun_cli.cmd_hf(args)
     assert rc == 1
-    assert "missing" in capsys.readouterr().out.lower()
+    assert "missing" in capsys.readouterr().err.lower()

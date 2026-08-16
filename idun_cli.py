@@ -23,14 +23,8 @@ from idun.client import IdunResult
 from idun.auth import maybe_refresh, _load_meta, REFRESH_SLACK
 from idun.welcome import maybe_welcome, show_welcome
 from idun import backends
+from idun import _cli_retro as UI
 
-BANNER = r"""
- ___    ___  _  _  _   _  _ _  _  _  _  ___  ___  ___
-|__ \  / _ \| \| |/_\ | \| | || | \| |/ _ \|   \| __|
-  / / | (_) | .` |/ _ \| .` | __ | .` | (_) | |) | _|
- /___| \___/|_|\_/_/ \_\_|\_|_||_|_|\_|\___/|___/|___|
-            NatureLM-Idun-5-MoE  ·  Azure AI Foundry
-"""
 
 
 def _add_backend_arg(p):
@@ -68,7 +62,7 @@ def _run(args, prompt) -> IdunResult:
 
 
 def cmd_login(args):
-    print(BANNER)
+    UI.banner()
     backend = getattr(args, "backend", None) or os.environ.get("IDUN_BACKEND") \
         or os.environ.get("IDUN_PROVIDER") or "azure"
     if backend == "azure":
@@ -79,56 +73,48 @@ def cmd_login(args):
         if tok:
             from idun.backends import save_hf_token
             save_hf_token(tok)
-            print("saved -> ~/hf_token.txt")
+            UI.ok("saved -> ~/hf_token.txt")
         return
     if backend == "github":
         tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
         if tok:
             from idun.backends import save_github_token
             save_github_token(tok)
-            print("saved -> ~/github_token.txt")
+            UI.ok("saved -> ~/github_token.txt")
         return
     sys.exit(f"login not supported for backend {backend!r}")
 
 
 def cmd_chat(args):
     res = _run(args, args.prompt)
-    print(res.text)
+    UI.chat_out(res.text, model=res.model,
+                backend=getattr(args, "backend", None)
+                or os.environ.get("IDUN_BACKEND")
+                or os.environ.get("IDUN_PROVIDER") or "azure")
 
 
 def cmd_trace(args):
     res = _run(args, args.prompt)
-    print(f"Model: {res.model}\n")
-    print("AGENT TRACE ({})".format(len(res.steps)))
-    print("=" * 60)
-    for i, s in enumerate(res.steps, 1):
-        if s.kind == "tool":
-            print(f"  {i:>2}. TOOL   web_search  [{s.status}]")
-            print(f"        query: {s.query}")
-        else:
-            head = s.text.replace("\n", " ").strip()[:90]
-            label = "REASON" if s.kind == "reasoning" else "MSG"
-            print(f"  {i:>2}. {label}  {head}{'…' if len(s.text) > 90 else ''}")
-    print("=" * 60)
-    print("\nFINAL ANSWER:")
-    print(res.text)
+    UI.trace_out(res, backend=getattr(args, "backend", None)
+                 or os.environ.get("IDUN_BACKEND")
+                 or os.environ.get("IDUN_PROVIDER") or "azure")
 
 
 def cmd_logo(_args):
-    print(BANNER)
-    print("Logo assets bundled with this package:")
-    print(f"  white : {logo_path('white')}")
-    print(f"  color : {logo_path('color')}")
+    UI.banner()
+    UI.info("Logo assets bundled with this package:")
+    print(f"  white : {logo_path('white')}", file=sys.stderr)
+    print(f"  color : {logo_path('color')}", file=sys.stderr)
 
 
 def cmd_openapi(args):
     """Print the bundled OpenAPI 3 spec (or its path)."""
     from idun import openapi_path
     if getattr(args, "path", False):
-        print(openapi_path())
+        print(openapi_path(), file=sys.stderr)
         return
     with open(openapi_path(), encoding="utf-8") as f:
-        print(f.read())
+        print(f.read(), file=sys.stderr)
 
 
 def cmd_welcome(_args):
@@ -137,25 +123,27 @@ def cmd_welcome(_args):
 
 def cmd_status(_args):
     from idun import backends as be
-    backend = os.environ.get("IDUN_BACKEND", "azure")
-    print(f"active backend : {backend}")
+    backend = os.environ.get("IDUN_BACKEND",
+                os.environ.get("IDUN_PROVIDER", "azure"))
+    lines = [("active backend", backend)]
     if backend == "azure":
         meta = _load_meta()
         ok = bool(meta and meta.get("access_token"))
-        print(f"  azure token  : {'present' if ok else 'MISSING (~/foundry_token.txt)'}")
+        lines.append(("azure token", "present" if ok else "MISSING (~/foundry_token.txt)"))
     elif backend == "hf":
         tok = be.load_hf_token()
-        print(f"  hf token     : {'present' if tok else 'MISSING'}")
-        print(f"  hf model     : {os.environ.get('HF_MODEL') or be.HF_DEFAULT_MODEL}")
+        lines.append(("hf token", "present" if tok else "MISSING"))
+        lines.append(("hf model", os.environ.get("HF_MODEL") or be.HF_DEFAULT_MODEL))
     elif backend == "github":
         tok = be.load_github_token()
-        print(f"  github token : {'present' if tok else 'MISSING'}")
-        print(f"  gh model     : {os.environ.get('GITHUB_MODEL') or be.GITHUB_DEFAULT_MODEL}")
+        lines.append(("github token", "present" if tok else "MISSING"))
+        lines.append(("gh model", os.environ.get("GITHUB_MODEL") or be.GITHUB_DEFAULT_MODEL))
     elif backend == "openai":
         tok = be.load_openai_token()
-        print(f"  openai token : {'present' if tok else 'MISSING'}")
-        print(f"  openai model : {os.environ.get('OPENAI_MODEL') or be.OPENAI_DEFAULT_MODEL}")
-        print(f"  openai base  : {os.environ.get('OPENAI_BASE') or be.OPENAI_DEFAULT_BASE}")
+        lines.append(("openai token", "present" if tok else "MISSING"))
+        lines.append(("openai model", os.environ.get("OPENAI_MODEL") or be.OPENAI_DEFAULT_MODEL))
+        lines.append(("openai base", os.environ.get("OPENAI_BASE") or be.OPENAI_DEFAULT_BASE))
+    UI.status_out(backend, lines)
 
 
 def cmd_hf(args):
@@ -165,36 +153,36 @@ def cmd_hf(args):
     sub = args.hf_command
     if sub == "whoami":
         if not token:
-            print("HF token missing. Set HF_TOKEN or ~/hf_token.txt "
-                  "(idun login --backend hf).")
+            UI.err("HF token missing. Set HF_TOKEN or ~/hf_token.txt "
+                   "(idun login --backend hf).")
             return 1
         try:
             info = hf.hf_whoami(token)
         except RuntimeError as e:
-            print(f"HF whoami failed: {e}")
+            UI.err(f"HF whoami failed: {e}")
             return 1
-        print(f"HF user : {info.get('name')}  (id {info.get('id')})")
+        UI.ok(f"HF user : {info.get('name')}  (id {info.get('id')})")
         orgs = [o.get('name') for o in info.get('orgs', [])]
         if orgs:
-            print(f"orgs    : {', '.join(orgs)}")
-        print(f"email   : {info.get('email') or '(private)'}")
+            UI.info(f"orgs    : {', '.join(orgs)}")
+        UI.info(f"email   : {info.get('email') or '(private)'}")
         return 0
     if sub == "status":
         model = args.model
         st = hf.hf_model_status(model, token)
         if st["error"]:
-            print(f"{model}: error -> {st['error']}")
+            UI.err(f"{model}: error -> {st['error']}")
             return 1
         if not st["exists"]:
-            print(f"{model}: NOT FOUND on the Hub")
+            UI.err(f"{model}: NOT FOUND on the Hub")
             return 1
         gated = st["gated"] or "no"
-        print(f"{model}: exists | gated={gated} | private={st['private']} | "
+        UI.ok(f"{model}: exists | gated={gated} | private={st['private']} | "
               f"task={st['pipeline_tag'] or 'n/a'}")
         return 0
     if sub == "push":
         if not token:
-            print("HF token missing. Set HF_TOKEN or ~/hf_token.txt.")
+            UI.err("HF token missing. Set HF_TOKEN or ~/hf_token.txt.")
             return 1
         model = args.model
         files = {}
@@ -203,45 +191,44 @@ def cmd_hf(args):
                 with open(f, encoding="utf-8") as fh:
                     files[os.path.basename(f)] = fh.read()
             except OSError as e:
-                print(f"cannot read {f}: {e}")
+                UI.err(f"cannot read {f}: {e}")
                 return 1
         try:
             commit = hf.hf_upload(model, files, token, private=args.private)
         except RuntimeError as e:
-            print(f"HF push failed: {e}")
+            UI.err(f"HF push failed: {e}")
             return 1
-        print(f"pushed {len(files)} file(s) to {model}")
-        print(f"commit: {commit.get('commitId', 'n/a')}")
+        UI.ok(f"pushed {len(files)} file(s) to {model}")
+        UI.info(f"commit: {commit.get('commitId', 'n/a')}")
         return 0
-    print("unknown hf subcommand")
+    UI.err("unknown hf subcommand")
     return 1
 
 
 def cmd_wizard(_args):
     """Universal first-run setup: picks a backend, captures creds/config,
     writes ~/.idunrc so every future `idun` call uses it globally."""
-    print(BANNER)
-    print("Idun Setup Wizard — configure a backend (runs for any user).")
-    print("-" * 60)
-    print("Available backends:")
-    print("  1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.")
-    print("  2) hf      — Hugging Face Inference API (free tier, needs HF token).")
-    print("  3) github  — GitHub Models (free tier, needs GitHub PAT).")
-    print("  4) openai  — OpenAI-compatible /v1/chat/completions (needs OPENAI_API_KEY).")
+    choices = [
+        "1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.",
+        "2) hf      — Hugging Face Inference API (free tier, needs HF token).",
+        "3) github  — GitHub Models (free tier, needs GitHub PAT).",
+        "4) openai  — OpenAI-compatible /v1/chat/completions (needs OPENAI_API_KEY).",
+    ]
+    UI.wizard_intro(choices)
     choice = input("Select backend [1-4]: ").strip()
     mapping = {"1": "azure", "2": "hf", "3": "github", "4": "openai"}
     backend = mapping.get(choice, "azure")
-    print(f"Selected: {backend}\n")
+    UI.info(f"Selected: {backend}")
 
     cfg = {}
     if backend == "azure":
-        print("Azure setup requires a tenant + Foundry resource.")
-        print("Run `idun login --backend azure` and complete the device-code flow.")
-        print("REQUIRED: no tenant ships with this package — point it at yours:")
-        print("  export IDUN_BASE=https://<resource>.services.ai.azure.com")
-        print("  export IDUN_PROJECT=<project>")
-        print("  export IDUN_AGENT=<agent>          # optional")
-        print("  export IDUN_TENANT=<tenant-guid>   # optional")
+        UI.err("Azure setup requires a tenant + Foundry resource.")
+        UI.info("Run `idun login --backend azure` and complete the device-code flow.")
+        UI.info("REQUIRED: no tenant ships with this package — point it at yours:")
+        UI.info("  export IDUN_BASE=https://<resource>.services.ai.azure.com")
+        UI.info("  export IDUN_PROJECT=<project>")
+        UI.info("  export IDUN_AGENT=<agent>          # optional")
+        UI.info("  export IDUN_TENANT=<tenant-guid>   # optional")
         cfg["IDUN_BACKEND"] = "azure"
     elif backend == "hf":
         tok = input("Hugging Face token (hf_...) [or blank for anonymous]: ").strip()
@@ -282,9 +269,9 @@ def cmd_wizard(_args):
         for k, v in cfg.items():
             f.write(f"export {k}={v}\n")
     os.chmod(rc, 0o600)
-    print(f"\nWrote config to {rc}")
-    print("Source it once:  source ~/.idunrc   (or restart your shell)")
-    print("Then:  idun chat \"Hello\"  (uses the configured backend)")
+    UI.ok(f"Wrote config to {rc}")
+    UI.info("Source it once:  source ~/.idunrc   (or restart your shell)")
+    UI.info('Then:  idun chat "Hello"  (uses the configured backend)')
 
 
 def cmd_token(args):
@@ -294,15 +281,15 @@ def cmd_token(args):
     expires_at = float(meta.get("expires_at", 0))
     remaining = int(expires_at - time.time())
     has_refresh = bool(meta.get("refresh_token"))
-    print(f"token len   : {len(meta.get('access_token', ''))}")
-    print(f"expires in  : {remaining}s ({'REFRESH PENDING' if remaining <= REFRESH_SLACK else 'ok'})")
-    print(f"refresh tok : {'yes' if has_refresh else 'no (device-code fallback)'}")
+    UI.info(f"token len   : {len(meta.get('access_token', ''))}")
+    UI.info(f"expires in  : {remaining}s ({'REFRESH PENDING' if remaining <= REFRESH_SLACK else 'ok'})")
+    UI.info(f"refresh tok : {'yes' if has_refresh else 'no (device-code fallback)'}")
     if args.refresh or args.force:
         new = maybe_refresh(force=True)
         if new:
-            print(f"refreshed -> len {len(new)}")
+            UI.ok(f"refreshed -> len {len(new)}")
         else:
-            print("refresh returned no token")
+            UI.err("refresh returned no token")
 
 
 def cmd_export(args):
@@ -311,22 +298,22 @@ def cmd_export(args):
     if args.output:
         with open(args.output, "w", encoding="utf-8") as f:
             f.write(payload)
-        print(f"wrote {args.fmt} trace -> {args.output} ({len(res.steps)} steps)")
+        UI.ok(f"wrote {args.fmt} trace -> {args.output} ({len(res.steps)} steps)")
     else:
-        print(payload)
+        print(payload, file=sys.stderr)
 
 
 def cmd_packs(_args):
     from idun import list_packs
     packs = list_packs()
     if not packs:
-        print("No prompt packs installed.")
+        UI.info("No prompt packs installed.")
         return
-    print("Available prompt packs:\n")
+    UI.info("Available prompt packs:\n")
     for pk in packs:
-        print(f"  {pk['name']}  ({pk['count']} prompts) — {pk['title']}")
+        UI.info(f"  {pk['name']}  ({pk['count']} prompts) — {pk['title']}")
         if pk["description"]:
-            print(f"    {pk['description']}")
+            UI.info(f"    {pk['description']}")
 
 
 def cmd_run(args):
@@ -337,10 +324,9 @@ def cmd_run(args):
         results = run_pack(args.pack, keys=None, max_output_tokens=args.max_tokens)
         for key, res in results:
             if isinstance(res, Exception):
-                print(f"\n=== {key} ===\n[ERROR] {res}")
+                UI.err(f"{key}: {res}")
                 continue
-            print(f"\n=== {key} ===")
-            print(res.text)
+            UI.chat_out(res.text, backend=args.pack)
         return
     if not args.key:
         sys.exit("either KEY or --all is required")
@@ -349,7 +335,10 @@ def cmd_run(args):
     except (FileNotFoundError, KeyError) as e:
         sys.exit(str(e))
     res = _run(args, prompt)
-    print(res.text)
+    UI.chat_out(res.text, model=res.model,
+                backend=getattr(args, "backend", None)
+                or os.environ.get("IDUN_BACKEND")
+                or os.environ.get("IDUN_PROVIDER") or "azure")
 
 
 def cmd_diff(args):
@@ -357,7 +346,7 @@ def cmd_diff(args):
     rb = _run(args, args.prompt_b)
     from idun import diff_traces, format_diff
     d = diff_traces(ra, rb)
-    print(format_diff(d, args.fmt))
+    print(format_diff(d, args.fmt), file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:

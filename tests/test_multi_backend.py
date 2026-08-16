@@ -132,5 +132,5 @@ def test_cli_status_runs(capsys):
     args = argparse.Namespace()
     # azure default, no token file side effects
     cmd_status(args)
-    out = capsys.readouterr().out
-    assert "active backend" in out
+    err = capsys.readouterr().err
+    assert "active backend" in err
