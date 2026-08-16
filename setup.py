@@ -72,13 +72,17 @@ setup(
         "Bug Tracker": "https://github.com/qapdex-maker/idun-sdk/issues",
     },
     packages=find_packages(),
-    py_modules=["idun_cli", "idun_mcp"],
+    py_modules=["idun_cli", "idun_mcp", "idun_multi"],
     package_data={"idun": ["data/*.svg", "data/prompt_packs/*.json", "openapi.json"]},
     python_requires=">=3.8",
     # stdlib-only: no runtime dependencies. Works headless on Termux.
     install_requires=[],
     cmdclass=_cmdclass,
-    entry_points={"console_scripts": ["idun=idun_cli:main", "idun-mcp=idun_mcp:main"]},
+    entry_points={"console_scripts": [
+        "idun=idun_cli:main",
+        "idun-mcp=idun_mcp:main",
+        "idun-multi=idun_multi:main",
+    ]},
     keywords=[
         "azure", "ai-foundry", "azure-ai-foundry", "agent", "tool-agent",
         "mcp", "model-context-protocol", "naturelm", "idun", "llm",
