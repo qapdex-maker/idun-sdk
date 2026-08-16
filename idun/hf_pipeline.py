@@ -166,7 +166,8 @@ def hf_upload(model: str, files: dict, token: str,
     repo_url = api.create_repo(model, private=private, exist_ok=True)
     ops = []
     from huggingface_hub import CommitOperationAdd
-    import tempfile, os as _os
+    import tempfile
+    import os as _os
     for path, content in files.items():
         tmp = tempfile.NamedTemporaryFile(
             mode="w", suffix=f"_{_os.path.basename(path)}", delete=False,

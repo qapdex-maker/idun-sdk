@@ -6,6 +6,7 @@ unconfigured user at somebody else's Foundry resource or Entra tenant.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 
@@ -114,3 +115,91 @@ def test_azure_provider_base_follows_idun_base(monkeypatch):
     monkeypatch.setenv("IDUN_BASE", "https://mine.services.ai.azure.com")
     assert providers.get_provider("azure").resolved_base() == \
         "https://mine.services.ai.azure.com"
+
+
+# --------------------------------------------------------------------------
+# SSRF / local-file guard on env-supplied endpoints (bandit B310)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("bad", [
+    "file:///etc/passwd",
+    "file://" + "/data/data/com.termux/files/home/.idunrc",
+    "ftp://example.com/x",
+    "gopher://example.com/x",
+    "/no/scheme/at/all",
+])
+def test_non_http_endpoints_are_refused(bad):
+    with pytest.raises(ValueError, match="non-HTTP"):
+        providers._post_json(bad, {}, {}, 5)
+
+
+@pytest.mark.parametrize("ok", [
+    "http://127.0.0.1:8080/v1/chat/completions",
+    "https://api.example.com/v1/chat/completions",
+    "HTTPS://API.EXAMPLE.COM/v1",
+])
+def test_http_schemes_pass_the_guard(ok):
+    # Guard must accept these; the request itself is not performed here.
+    assert providers._require_http_url(ok) == ok
+
+
+def test_hostile_base_env_cannot_read_local_files(monkeypatch):
+    """A poisoned IDUN_<ID>_BASE must not turn into a file:// read."""
+    monkeypatch.setenv("IDUN_GROQ_BASE", "file:///etc/passwd")
+    monkeypatch.setenv("GROQ_API_KEY", "k")
+    with pytest.raises(ValueError, match="non-HTTP"):
+        providers.complete("groq", "hi")
+
+
+# --------------------------------------------------------------------------
+# External-review fixes: credential hygiene + secret redaction
+# --------------------------------------------------------------------------
+
+def test_save_credential_is_created_owner_only(monkeypatch, tmp_path):
+    monkeypatch.setattr(providers, "CONFIG_DIR", str(tmp_path))
+    p = providers.get_provider("openrouter")
+    path = providers.save_credential(p, "sk-secret-value")
+    st = os.stat(path)
+    # owner read/write only -- no group/other bits
+    assert oct(st.st_mode & 0o077) == "0o0"
+    assert open(path).read() == "sk-secret-value"
+
+
+def test_save_credential_failure_leaves_no_partial_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(providers, "CONFIG_DIR", str(tmp_path))
+    p = providers.get_provider("groq")
+    real_open = os.open
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(os, "open", boom)
+    with pytest.raises(OSError):
+        providers.save_credential(p, "x")
+    assert not (tmp_path / "groq.token").exists()
+    monkeypatch.setattr(os, "open", real_open)
+
+
+def test_error_body_secrets_are_redacted():
+    leak = ('{"error":"invalid","Authorization":"Bearer sk-live-ABC123",'
+            '"detail":"api_key=sk-live-ABC123 token=pypi-AgEIabc"}')
+    clean = providers._sanitize_error_body(leak)
+    assert "sk-live-ABC123" not in clean
+    assert "pypi-AgEIabc" not in clean
+    assert "<redacted>" in clean
+
+
+def test_hf_transport_prepends_system_prompt(monkeypatch):
+    captured = {}
+
+    def fake_post(url, body, headers, timeout):
+        captured["inputs"] = body["inputs"]
+        return {"generated_text": "ok"}
+
+    monkeypatch.setenv("HF_API_KEY", "t")
+    monkeypatch.setattr(providers, "_post_json", fake_post)
+    providers.complete("hf", "hi there", model="m",
+                       system="You are terse.")
+    assert captured["inputs"].startswith("You are terse.")
+    assert "hi there" in captured["inputs"]

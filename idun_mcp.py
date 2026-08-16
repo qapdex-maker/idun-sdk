@@ -16,7 +16,9 @@ environment (same as the CLI). Entra device-code login is the caller's job
 Run:
   python3 idun_mcp.py            # stdio MCP server
 """
-import sys, os, json
+import sys
+import os
+import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from idun.client import IdunClient
@@ -129,7 +131,6 @@ def _tool_trace(prompt):
 
 
 def _tool_export(prompt, fmt="json"):
-    from idun import IdunResult
     res = _client().complete(prompt)
     if fmt == "md":
         return res.to_markdown()

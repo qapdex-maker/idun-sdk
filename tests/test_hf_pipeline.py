@@ -1,5 +1,4 @@
 """Offline tests for idun.hf_pipeline + the `idun hf` CLI subcommand."""
-import importlib
 import os
 import sys
 

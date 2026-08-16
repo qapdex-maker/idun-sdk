@@ -17,7 +17,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 
 __all__ = ["maybe_welcome", "show_welcome"]
 

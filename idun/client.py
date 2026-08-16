@@ -339,17 +339,16 @@ class IdunClient:
 
         try:
             data = self._post_with_retry(prompt, max_output_tokens)
-        except RuntimeError as re:
+        except RuntimeError as exc:
             # RuntimeError from _post_with_retry may wrap a 401 — unwrap and
             # apply the token-rotation retry path.
-            if "Foundry HTTP 401" in str(re):
+            # NOTE: do not name this `re` — it shadows the stdlib module and is
+            # a trap for any later edit that needs a regex here.
+            if "Foundry HTTP 401" in str(exc):
                 rotated = maybe_refresh(force=True)
                 if rotated:
                     self.token = rotated
-                    try:
-                        data = self._post_with_retry(prompt, max_output_tokens)
-                    except RuntimeError as re2:
-                        raise
+                    data = self._post_with_retry(prompt, max_output_tokens)
                 else:
                     raise
             else:

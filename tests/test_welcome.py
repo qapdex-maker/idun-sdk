@@ -5,7 +5,6 @@ frame behind when killed by the timeout, painting over the ASCII-art banner so
 only the two bright text lines survived. The fix forces a screen reset after
 cmatrix returns, before the banner is printed.
 """
-import importlib
 import io
 import sys
 

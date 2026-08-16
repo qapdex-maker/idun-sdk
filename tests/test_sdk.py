@@ -118,7 +118,7 @@ def test_logo_path_resolves_bundled_svg():
 
 def test_async_complete_offline(monkeypatch):
     import asyncio
-    from idun import IdunClient, IdunResult
+    from idun import IdunClient
     c = IdunClient(token="fake")
     def fake_post(self, prompt, max_tokens):
         return {"model": "gpt-x", "output": [
@@ -317,7 +317,7 @@ def test_conversation_threads_history(monkeypatch):
 
 def test_conversation_message_list_shape(monkeypatch):
     """Conversation._to_messages builds a Foundry message-list (not a text prefix)."""
-    from idun import IdunClient, Conversation, IdunResult
+    from idun import IdunClient, Conversation
     c = IdunClient(token="fake")
     conv = Conversation(c)
     msgs = conv._to_messages([("user", "Q1"), ("assistant", "A1")], "Q2")

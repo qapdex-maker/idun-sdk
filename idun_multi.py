@@ -23,7 +23,7 @@ import sys
 from idun import providers as P
 from idun import retro as R
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 RC_PATH = os.path.join(os.path.expanduser("~"), ".idunrc")
 
 
@@ -93,7 +93,7 @@ def cmd_login(args) -> int:
         return 0
     import getpass
     prompt = f"{p.label} key ({p.env_key}): "
-    token = args.token or getpass.getpass(prompt)
+    token = getpass.getpass(prompt)
     if not token.strip():
         print(R.status("err", "empty key, aborted."))
         return 1
@@ -282,7 +282,7 @@ def cmd_wizard(args) -> int:
         print(R.status("warn", "stdin is not a TTY — wizard needs an interactive "
                                "shell."))
         print(R.status("info", "non-interactive alternative:"))
-        print("    idun-multi login --provider groq --token <KEY>")
+        print("    idun-multi login --provider groq   # then type the key at the prompt")
         print("    export IDUN_PROVIDER=groq")
         return 1
 
@@ -367,7 +367,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("login", help="store an API key for a provider")
     sp.add_argument("--provider", default="")
-    sp.add_argument("--token", default="", help="key (omit for a hidden prompt)")
     sp.set_defaults(func=cmd_login)
 
     sp = sub.add_parser("ask", help="send one prompt")

@@ -25,9 +25,10 @@ import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field, replace
-from typing import Callable
+from typing import Callable  # noqa: F401  (re-exported by the public API)
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".idun")
 
@@ -66,9 +67,9 @@ class Provider:
     free_tier: bool = False
     needs_key: bool = True
     notes: str = ""
-    # transport: "openai" (chat/completions), or a custom callable
+    # transport: "openai" (chat/completions) / "anthropic" / "hf". Custom
+    # transports register in _TRANSPORTS instead of via this field.
     transport: str = "openai"
-    caller: Callable | None = field(default=None, repr=False, compare=False)
 
     # ---- credential storage -------------------------------------------
     @property
@@ -266,18 +267,26 @@ def resolve_credential(p: Provider) -> str:
 
 
 def save_credential(p: Provider, token: str) -> str:
-    """Persist a provider key to ~/.idun/<id>.token with 0600 perms."""
+    """Persist a provider key to ~/.idun/<id>.token with 0600 perms.
+
+    The file is created atomically with mode 0o600 via os.open(O_CREAT|O_EXCL),
+    so there is never a window where the token sits on disk with the process
+    umask (typically 0644) before a separate chmod. A missing/permissive
+    ~/.idun is tightened to 0700; failure there is non-fatal because the file
+    itself is already owner-only.
+    """
     os.makedirs(CONFIG_DIR, exist_ok=True)
     try:
         os.chmod(CONFIG_DIR, 0o700)
     except OSError:
         pass
-    with open(p.token_file, "w", encoding="utf-8") as fh:
-        fh.write(token.strip())
+    fd = os.open(p.token_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
-        os.chmod(p.token_file, 0o600)
-    except OSError:
-        pass
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(token.strip())
+    except BaseException:
+        os.unlink(p.token_file)
+        raise
     return p.token_file
 
 
@@ -296,15 +305,49 @@ def credential_status(p: Provider) -> str:
 # --------------------------------------------------------------------------
 
 
+def _require_http_url(url: str) -> str:
+    """Reject anything but http(s).
+
+    Base URLs come from the environment (IDUN_<ID>_BASE), so a hostile or
+    mistyped value could otherwise make urlopen() read local files via
+    `file://` — while an Authorization header carrying the API key is
+    attached to the request. Fail closed instead.
+    """
+    scheme = urllib.parse.urlsplit(url).scheme.lower()
+    if scheme not in ("http", "https"):
+        raise ValueError(
+            f"refusing non-HTTP(S) endpoint {url!r} (scheme {scheme or 'none'!r}); "
+            "check your IDUN_*_BASE configuration")
+    return url
+
+
+def _sanitize_error_body(body: str) -> str:
+    """Strip likely secrets from a provider error response before logging.
+
+    Some providers echo the Authorization header or the API key back in a 4xx/
+    5xx body. That text ends up in exception messages, logs and CI output, so
+    redact anything that looks like a credential before it leaves this module.
+    """
+    import re
+    # Bearer tokens and common key shapes (sk-, pypi-, hf_, etc.)
+    body = re.sub(r"(?i)(Bearer\s+)[A-Za-z0-9._\-]+", r"\1<redacted>", body)
+    body = re.sub(r"(?i)\b(sk|pk|api[_-]?key|token|secret)[=:\s]+[^\s\"',}]+",
+                  r"\1=<redacted>", body)
+    body = re.sub(r"\bpypi-[A-Za-z0-9._\-]{8,}", "<redacted>", body)
+    return body
+
+
 def _post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
+    _require_http_url(url)
     req = urllib.request.Request(
         url, data=json.dumps(body).encode("utf-8"), headers=headers,
         method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
-        detail = e.read().decode("utf-8", "replace")[:400]
+        detail = _sanitize_error_body(
+            e.read().decode("utf-8", "replace")[:400])
         raise RuntimeError(f"HTTP {e.code} from {url}: {detail}") from e
     except urllib.error.URLError as e:
         raise RuntimeError(f"cannot reach {url}: {e.reason}") from e
@@ -349,7 +392,13 @@ def _call_hf(p: Provider, prompt: str, model: str, token: str, *,
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    body = {"inputs": prompt,
+    # HF Inference API has no system-message field. Prepend the system prompt
+    # to the user input; this is approximate but keeps the instruction visible
+    # to models whose chat template expects a leading system turn.
+    inputs = prompt
+    if system:
+        inputs = f"{system}\n\n{prompt}"
+    body = {"inputs": inputs,
             "parameters": {"max_new_tokens": max_tokens,
                            "temperature": temperature,
                            "return_full_text": False}}
