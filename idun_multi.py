@@ -179,7 +179,7 @@ def cmd_ask(args) -> int:
     # streaming returns a generator of text chunks; non-streaming a Completion
     if args.stream:
         chunks = result  # generator[str]
-        if not args.raw and not args.json:
+        if not args.raw and not getattr(args, "json", False):
             print(R.header("IDUN RESPONSE (stream)",
                            f"{pid} · {args.model or '(default)'}"))
             print()
@@ -191,14 +191,14 @@ def cmd_ask(args) -> int:
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
                 # JSON mode: collect only; emit a single object at the end
-                elif not args.json:
+                elif not getattr(args, "json", False):
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
         except (RuntimeError, ValueError) as e:
             print(R.status("err", str(e)))
             return 1
         text = "".join(full)
-        if args.json:
+        if getattr(args, "json", False):
             # streamed JSON: emit a completion-shaped object
             print(json.dumps({"provider": pid, "model": args.model or "",
                               "text": text, "streamed": True},
@@ -207,7 +207,7 @@ def cmd_ask(args) -> int:
             print()
             print(R.rule())
     else:
-        _render_completion(result, raw=args.raw, as_json=args.json)
+        _render_completion(result, raw=args.raw, as_json=getattr(args, "json", False))
         text = result.text
 
     # build the cumulative transcript and optionally persist it
@@ -526,7 +526,7 @@ def cmd_shell(args) -> int:
             print()
         else:
             text = result.text
-            _render_completion(result, raw=False, as_json=args.json)
+            _render_completion(result, raw=False, as_json=getattr(args, "json", False))
 
         history.append({"role": "user", "content": line})
         history.append({"role": "assistant", "content": text})
