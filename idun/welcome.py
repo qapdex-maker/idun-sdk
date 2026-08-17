@@ -2,11 +2,9 @@
 """First-run welcome + setup for the Idun SDK CLI.
 
 Shows an ASCII-art Idun banner (a world-tree / "tree of knowledge" motif in
-the brand purple), a short optional cmatrix flourish as an Easter egg, and a
-hard terminal reset afterwards so the shell is never left in a broken state
-(cursor hidden / alternate screen stuck). Everything degrades silently: no
-external dependency, no crash if `cmatrix` is missing or the terminal is
-non-interactive.
+the brand purple), and guarantees the shell is left usable afterwards (cursor
+visible, no stuck alternate screen). Pure stdlib, no external dependencies, no
+crash when the terminal is non-interactive.
 
 Public API:
     maybe_welcome()  -> call once at CLI startup; shows the welcome at most
@@ -19,21 +17,9 @@ Public API:
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
 import sys
 
 __all__ = ["maybe_welcome", "show_welcome"]
-
-# shortest-path term width (avoid importing retro just for this)
-def _term_width(default: int = 80) -> int:
-    try:
-        return max(40, min(shutil.get_terminal_size((default, 24)).columns, 120))
-    except OSError:
-        return default
-
-
-# colour keys used by the ascii scene, mapped to 256-colour / 16-colour codes
 _COLOR_CODE = {
     "purple": "\033[38;5;141m",
     "blue": "\033[38;5;57m",
@@ -42,7 +28,7 @@ _COLOR_CODE = {
     "gold": "\033[38;5;221m",
 }
 
-# Flag file so the matrix/welcome only appears on the very first run after
+# Flag file so the welcome only appears on the very first run after
 # a fresh `pip install`. Lives in the user's home, not the package dir.
 _FLAG = os.path.join(os.path.expanduser("~"), ".idun_sdk_firstrun")
 
@@ -101,16 +87,6 @@ _TAGLINE = (
     + " — thin client + CLI (stdlib-only)"
 )
 
-# cmatrix colour closest to the Idun purple (#8b5cf6). "magenta" reads best
-# on dark terminals; fall back to "blue" if you prefer the Azure tint.
-_CMATRIX_COLOR = "magenta"
-_CMATRIX_SECONDS = 2
-
-
-def _cmatrix_available() -> bool:
-    return shutil.which("cmatrix") is not None
-
-
 def _shown_before() -> bool:
     try:
         return os.path.exists(_FLAG)
@@ -126,40 +102,19 @@ def _mark_shown() -> None:
         pass
 
 
-def _run_cmatrix() -> None:
-    """Best-effort short matrix flourish. Never raises."""
-    if not _cmatrix_available():
-        return
-    # Only animate on a real terminal. Under pytest / CI, stdout is a redirect
-    # (not a tty), so cmatrix would run the full timeout and hang the suite.
-    if not sys.stdout.isatty():
-        return
-    # Plain mode (NOT -s screensaver): -s restores the *original* main screen on
-    # a clean key exit, which can drop our banner. Plain alternate-screen mode
-    # returns to the main screen cleanly on SIGTERM/timeout.
-    cmd = ["cmatrix", "-u", "4", "-C", _CMATRIX_COLOR]
-    try:
-        subprocess.run(cmd, timeout=_CMATRIX_SECONDS + 2,
-                       check=False, stdin=sys.stdin)
-    except Exception:
-        pass
-
-
 def _hard_reset() -> None:
     """Fully restore the terminal to a usable interactive state.
 
-    cmatrix hides the cursor (?25l) and may leave the alternate screen buffer
-    active when killed by our timeout. If we don't undo BOTH, the shell prompt
-    comes back but is invisible / input echo is gone — exactly the "bash is
-    broken after idun welcome" symptom. We send, in order:
+    Guarantees the cursor is visible and no alternate screen is left stuck
+    (in case any prior program left the terminal in a broken state). We send,
+    in order:
 
       ?25h  show cursor
       ?1049l leave alternate screen
       2J    clear screen
       H     move cursor home
       0m    reset colour/attributes
-      \\033c RIS full reset — the nuclear option that restores every terminal
-            mode (cursor, alt screen, mouse tracking, keypad) to defaults.
+      \033c RIS full reset — restores every terminal mode to defaults.
     """
     try:
         sys.stdout.write("\033[?25h\033[?1049l\033[2J\033[H\033[0m\033c")
@@ -169,13 +124,11 @@ def _hard_reset() -> None:
 
 
 def _print_welcome_art() -> None:
-    """Emit the ASCII banner (own art, not just cmatrix) on a clean screen.
+    """Emit the ASCII banner on a clean screen.
 
     Everything is left-aligned with a fixed 2-space indent (no terminal-width
-    centring). Centring relies on shutil.get_terminal_size, which in a PTY/SSH
-    often returns 80 even when the visible Termux window is ~50 cols wide —
-    that mismatch is what made the scene look shifted/skew in the screenshot.
-    Left-aligned art stays flush at every width.
+    centring). Left-aligned art stays flush at every width, including narrow
+    Termux windows where the reported terminal width is unreliable.
     """
     sys.stdout.write("\033[2J\033[H\033[?25h")
     sys.stdout.write("\n")
@@ -202,12 +155,8 @@ def _print_tree_scene() -> None:
         sys.stdout.write(indent + code + line + _RESET + "\n")
 
 
-def show_welcome(force_cmatrix: bool = False) -> None:
-    """Print the Idun ASCII banner, optionally preceded by a matrix flourish."""
-    interactive = sys.stdout.isatty()
-    if interactive or force_cmatrix:
-        _run_cmatrix()
-        _hard_reset()          # undo cmatrix's cursor-hide / alt-screen
+def show_welcome() -> None:
+    """Print the Idun ASCII banner and guarantee a usable shell afterwards."""
     _print_welcome_art()       # draw on a guaranteed-clean, visible screen
     _hard_reset()              # final guarantee: cursor visible, shell usable
 
@@ -221,4 +170,4 @@ def maybe_welcome() -> None:
 
 
 if __name__ == "__main__":
-    show_welcome(force_cmatrix=sys.stdout.isatty())
+    show_welcome()

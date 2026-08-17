@@ -124,7 +124,7 @@ def cmd_openapi(args):
 
 def cmd_welcome(_args):
     from idun.welcome import show_welcome
-    show_welcome(force_cmatrix=sys.stdout.isatty())
+    show_welcome()
     UI.info("Run `idun wizard` for first-run setup, or `idun chat` to begin.")
     return 0
 
@@ -455,8 +455,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser(
         "welcome",
-        help="show the Idun welcome (banner + matrix)",
-        description="Render the Idun welcome screen (banner + matrix rain).\n\nExample:\n  idun welcome",
+        help="show the Idun welcome (ASCII banner)",
+        description="Render the Idun welcome screen (ASCII art banner).\n\nExample:\n  idun welcome",
     ).set_defaults(func=cmd_welcome)
 
     pw = sub.add_parser(

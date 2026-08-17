@@ -118,10 +118,9 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
 
 1. **Welcome → wizard redirect removed (v1.0.6)** — `idun welcome` no longer
    auto-launched the interactive setup wizard (the "broken redirect": the
-   banner + cmatrix would drop the user straight into a blocking `input()`
-   prompt they could not exit). `show_welcome_then_wizard()` was deleted;
-   `cmd_welcome` now only renders the banner (cmatrix flourish preserved,
-   guarded by the hard terminal reset) and points the user at `idun wizard`.
+   banner would drop the user straight into a blocking `input()` prompt they
+   could not exit). `show_welcome_then_wizard()` was deleted; `cmd_welcome`
+   now only renders the banner and points the user at `idun wizard`.
 2. **Wizard UX rework (v1.0.6)** — `idun wizard` gained:
    - **More choice** — added option `5) other` for ANY generic
      OpenAI-compatible endpoint (base URL + key + model), so non-listed
@@ -135,6 +134,12 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
      clear message instead of hanging on `input()`.
    Tests: `tests/test_wizard.py` (5 cases) + regression guard in
    `tests/test_welcome.py`.
+3. **cmatrix dependency removed (v1.0.7)** — the optional `cmatrix` matrix
+   rain Easter egg was fully deleted (no `subprocess`/`shutil.which` spawn, no
+   `force_cmatrix` param, no install_requires entry). It was the recurring
+   install/runtime breaker. `idun welcome` now renders the pure ASCII banner
+   only and still guarantees a usable shell via the hard terminal reset.
+   `tests/test_welcome.py` rewritten without any cmatrix reference.
 
 ---
 
