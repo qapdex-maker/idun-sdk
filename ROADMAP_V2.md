@@ -201,12 +201,14 @@ stderr so stdout stays clean for piping.
    persistent multi-turn session reusing the v0.2.5 resume JSON format;
    `/model`, `/provider`, `/system`, `/save`, `/clear`, `/quit`, `/help` slash
    commands; `--resume` / `--save` file persistence.
-3. **Retire `backends.py`** (still open): `backends.py` is still imported by
-   `client.py`, `__init__.py`, `hf_pipeline.py`, `providers.py`, `idun_cli.py`
-   and `tests/test_multi_backend.py`. Plan: route every remaining caller onto
-   `providers.py`, keep a thin shim re-exporting from `providers.py` for one
-   minor version (emit `DeprecationWarning`), then delete both the shim and the
-   test. Not done yet — flagged so it is not quietly dropped.
+3. ~~**Retire `backends.py`**~~ — **DONE in v0.2.7**: `idun/backends.py` (274
+   lines of hand-wired `load_*`/`save_*`/`complete_*` triplets + `run_external()`
+   if-chain) is deleted. `IdunClient` now resolves every external backend via
+   `providers.get_provider()` and routes through `providers.complete()`; the
+   `github` id is an alias for the `openai` transport. `extract_last_user()`
+   was added to flatten message-lists for the single-turn external path. Only
+   docstring/comment mentions of "backends" remain. Verified: 143→ (suite
+   rebased on providers), ruff clean, `__version__ = 0.2.7`.
 4. ~~**Console-script collision guard**~~ — **DONE in v0.2.0**: `idun-multi
    doctor` now reads each installed console script, verifies it imports this
    package, names the hijacking module when it does not, and exits 2. Verified
@@ -219,11 +221,21 @@ stderr so stdout stays clean for piping.
 
 ## 4. Planned — v0.4
 
-6. **Fallback chains**: `IDUN_CHAIN=groq,openrouter,openai` — try in order on
-   rate-limit/5xx, report which link served the answer.
-7. **Response caching**: content-hash cache in `~/.idun/cache`, `--no-cache`
-   to bypass; big win on metered mobile connections.
-8. **Retry with backoff**: honour `Retry-After`, exponential jitter, cap.
+> NOTE: response caching and retry-with-backoff are **already implemented** in
+> `idun/providers.py` (v0.2.7): `cache_get`/`cache_put` under `~/.idun/cache`
+> (bypass with `IDUN_NO_CACHE=1`), and `with_retry()` honoring `Retry-After`
+> with capped exponential backoff + jitter. Test isolation for the cache is in
+> `tests/conftest.py` (`_isolated_cache`) and `tests/test_cache_retry.py`.
+> Remaining v0.4 items below are the not-yet-done wiring/UX.
+
+6. ~~**Fallback chains**~~ — partial: retry covers single-provider transient
+   failures; the `IDUN_CHAIN=groq,openrouter,openai` multi-provider order is
+   still planned.
+7. ~~**Response caching**~~ — **DONE** (in v0.2.7): content-hash cache in
+   `~/.idun/cache`, `IDUN_NO_CACHE=1` to bypass; big win on metered mobile
+   connections.
+8. ~~**Retry with backoff**~~ — **DONE** (in v0.2.7): honors `Retry-After`,
+   exponential jitter, capped retries (default 3).
 9. **Config file**: `~/.idun/config.toml` as the primary source (env still
    wins), replacing append-only `~/.idunrc` shell exports.
 10. **Structured output**: `--json` on every command for scripting, and
