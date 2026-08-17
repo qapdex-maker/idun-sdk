@@ -111,7 +111,10 @@ def cmd_login(args) -> int:
     return 0
 
 
-def _render_completion(c: P.Completion, *, raw: bool) -> None:
+def _render_completion(c: P.Completion, *, raw: bool, as_json: bool = False) -> None:
+    if as_json:
+        print(json.dumps(c.to_dict(), ensure_ascii=False, indent=2))
+        return
     if raw:
         print(c.text)
         return
@@ -169,7 +172,7 @@ def cmd_ask(args) -> int:
     # streaming returns a generator of text chunks; non-streaming a Completion
     if args.stream:
         chunks = result  # generator[str]
-        if not args.raw:
+        if not args.raw and not args.json:
             print(R.header("IDUN RESPONSE (stream)",
                            f"{pid} · {args.model or '(default)'}"))
             print()
@@ -180,19 +183,24 @@ def cmd_ask(args) -> int:
                 if args.raw:
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
-                else:
-                    # incremental, no clear-screen: append in place
+                # JSON mode: collect only; emit a single object at the end
+                elif not args.json:
                     sys.stdout.write(chunk)
                     sys.stdout.flush()
         except (RuntimeError, ValueError) as e:
             print(R.status("err", str(e)))
             return 1
         text = "".join(full)
-        if not args.raw:
+        if args.json:
+            # streamed JSON: emit a completion-shaped object
+            print(json.dumps({"provider": pid, "model": args.model or "",
+                              "text": text, "streamed": True},
+                             ensure_ascii=False, indent=2))
+        elif not args.raw:
             print()
             print(R.rule())
     else:
-        _render_completion(result, raw=args.raw)
+        _render_completion(result, raw=args.raw, as_json=args.json)
         text = result.text
 
     # build the cumulative transcript and optionally persist it
@@ -510,7 +518,7 @@ def cmd_shell(args) -> int:
             print()
         else:
             text = result.text
-            _render_completion(result, raw=False)
+            _render_completion(result, raw=False, as_json=args.json)
 
         history.append({"role": "user", "content": line})
         history.append({"role": "assistant", "content": text})
@@ -520,6 +528,33 @@ def cmd_shell(args) -> int:
     if save_path and history:
         _save_history(save_path, history)
         print(R.status("info", f"session saved -> {save_path}"))
+    return 0
+
+
+def cmd_schema(args) -> int:
+    """Print the response schema an Idun call returns (for JSON-mode clients)."""
+    try:
+        p = P.get_provider(_active(args))
+    except ValueError as e:
+        print(R.status("err", str(e)))
+        return 2
+    schema = {
+        "provider": p.id,
+        "model": p.resolved_model(),
+        "transport": p.transport,
+        "response": {
+            "provider": "string",
+            "model": "string",
+            "text": "string",
+            "prompt_tokens": "int",
+            "completion_tokens": "int",
+            "total_tokens": "int",
+            "latency_ms": "int",
+        },
+        "json_mode_supported": p.transport in ("openai", "azure"),
+        "notes": "Pass --json to `ask` to get exactly this shape per call.",
+    }
+    print(json.dumps(schema, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -575,6 +610,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--stream", action="store_true",
                     help="stream tokens as they arrive (openai transport)")
     sp.add_argument("--raw", action="store_true", help="plain text, no chrome")
+    sp.add_argument("--json", action="store_true",
+                    help="emit the Completion as JSON (for scripting)")
     sp.set_defaults(func=cmd_ask)
 
     sp = sub.add_parser("shell", help="interactive multi-turn REPL")
@@ -588,6 +625,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--stream", action="store_true",
                     help="stream tokens as they arrive (openai transport)")
     sp.add_argument("--timeout", type=int, default=120)
+    sp.add_argument("--json", action="store_true",
+                    help="emit each turn as JSON (for scripting)")
     sp.set_defaults(func=cmd_shell)
 
     sp = sub.add_parser("race", help="compare providers on one prompt")
@@ -600,6 +639,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("doctor", help="environment and credential audit")
     sp.set_defaults(func=cmd_doctor)
+
+    sp = sub.add_parser("schema", help="show the JSON response schema")
+    sp.set_defaults(func=cmd_schema)
 
     sp = sub.add_parser("wizard", help="interactive setup")
     sp.set_defaults(func=cmd_wizard)

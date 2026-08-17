@@ -53,6 +53,31 @@ class Completion:
     def total_tokens(self) -> int:
         return self.prompt_tokens + self.completion_tokens
 
+    def to_dict(self) -> dict:
+        """A JSON-serialisable view (raw may be large; see ``raw_lite``)."""
+        d = {
+            "provider": self.provider,
+            "model": self.model,
+            "text": self.text,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens,
+            "latency_ms": self.latency_ms,
+        }
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Completion":
+        """Reconstruct from ``to_dict`` output (raw is dropped)."""
+        return cls(
+            text=d.get("text", ""),
+            model=d.get("model", ""),
+            provider=d.get("provider", ""),
+            prompt_tokens=int(d.get("prompt_tokens", 0)),
+            completion_tokens=int(d.get("completion_tokens", 0)),
+            latency_ms=int(d.get("latency_ms", 0)),
+        )
+
 
 @dataclass(frozen=True)
 class Provider:
