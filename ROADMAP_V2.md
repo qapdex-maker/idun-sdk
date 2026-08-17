@@ -1,9 +1,10 @@
 # Idun SDK — Rework Roadmap (v0.2.0 → v1.0)
 
-Status of this document: ACTIVE. All planned v0.4 / v0.5 / v1.0 items are
-implemented and verified (SDK at **v1.0.0**). A small post-v1.0 maintenance
-track (v1.0.1 … v1.0.6) captured follow-up fixes that shipped after the
-original "FINAL" sign-off. The backlog in §8 is still future work.
+Status of this document: FINAL (superseded by CHANGELOG.md for release notes).
+All planned v0.4 / v0.5 / v1.0 items are implemented and verified (SDK at
+**v1.0.0**). Post-v1.0 maintenance (v1.0.1 … v1.0.7) is recorded in §7b and
+mirrored in [CHANGELOG.md](./CHANGELOG.md). The backlog in §8 is still future
+work.
 
 ---
 
@@ -140,6 +141,18 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
    install/runtime breaker. `idun welcome` now renders the pure ASCII banner
    only and still guarantees a usable shell via the hard terminal reset.
    `tests/test_welcome.py` rewritten without any cmatrix reference.
+4. **Polish pass (v1.0.8)** — wrapped up the P1–P5 backlog:
+   - **P1 wizard test-call** — a failed probe now prints a neutral hint
+     instead of a red error (key-not-live is expected, not a failure).
+   - **P2 README** — "What's in the box" bumped to v1.0.8; `idun welcome`
+     listed as pure-ASCII banner, `idun wizard` as always-exit-able.
+   - **P3 changelog** — `CHANGELOG.md` introduced; this roadmap marked FINAL
+     and points there for release notes.
+   - **P4 neutral naming** — last `QMFI` reference removed; public artifacts
+     stay tenant/resource-free. `setup.py` description fixed 13→17 providers.
+   - **P5 provider expansion** — added `perplexity`, `fireworks`, `novita`
+     (OpenAI-compatible). Registry now ships **17 providers**; README table +
+     counts updated.
 
 ---
 

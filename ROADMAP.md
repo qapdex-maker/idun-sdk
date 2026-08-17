@@ -20,7 +20,7 @@ Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
 - **CodeRabbit**: PR #1 (idun-sdk, async-Fix) + PR #3 (playground, SSE-guard)
   gemergt — beide 🎉 ohne actionable Findings reviewt. `.coderabbit.yaml`
   path_filters-Bug behoben (alle diff-scoped Files werden jetzt erfasst).
-- **Docs**: README/long_description (QMFI entfernt, "no admin needed"),
+- **Docs**: README/long_description ("no admin needed", neutral naming),
   Sentry-MCP-Sektion (remote `https://mcp.sentry.dev/mcp` + `mcp-remote`
   OAuth-Flow), `.mcp.example.json` (idun + idun-docs + sentry Combo).
 - **CI**: `pytest`-Suite (wird über `run_tests.sh` ausgeführt, cwd-gepinnt +

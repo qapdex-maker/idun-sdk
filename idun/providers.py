@@ -282,6 +282,40 @@ REGISTRY: tuple[Provider, ...] = (
         free_tier=True,
         notes="Point IDUN_LOCAL_BASE at any OpenAI-compatible server.",
     ),
+    Provider(
+        id="perplexity",
+        label="Perplexity Sonar (web-grounded)",
+        base="https://api.perplexity.ai",
+        default_model="sonar",
+        env_keys=("PERPLEXITY_API_KEY",),
+        models=("sonar", "sonar-pro", "sonar-reasoning", "sonar-reasoning-pro"),
+        notes="OpenAI-compatible; answers are web-grounded by default.",
+    ),
+    Provider(
+        id="fireworks",
+        label="Fireworks AI",
+        base="https://api.fireworks.ai/inference/v1",
+        default_model="accounts/fireworks/models/llama-v3p3-70b-instruct",
+        env_keys=("FIREWORKS_API_KEY",),
+        models=(
+            "accounts/fireworks/models/llama-v3p3-70b-instruct",
+            "accounts/fireworks/models/llama-4-scout-instruct-basic",
+            "accounts/fireworks/models/deepseek-r1",
+        ),
+    ),
+    Provider(
+        id="novita",
+        label="Novita AI",
+        base="https://api.novita.ai/v3/openai",
+        default_model="meta-llama/llama-3.3-70b-instruct",
+        env_keys=("NOVITA_API_KEY",),
+        models=(
+            "meta-llama/llama-3.3-70b-instruct",
+            "deepseek/deepseek-v3-turbo",
+            "qwen/qwen2.5-72b-instruct",
+        ),
+        notes="OpenAI-compatible; broad open-model catalogue.",
+    ),
 )
 
 _BY_ID = {p.id: p for p in REGISTRY}

@@ -344,7 +344,11 @@ def cmd_wizard(_args):
 
 
 def _wizard_test_call(backend: str) -> None:
-    """Best-effort smoke test of the chosen backend; never raises."""
+    """Best-effort smoke test of the chosen backend; never raises, never
+    prints a scary error. A failed probe is expected when the user picked
+    ``skip``-style defaults or a generic endpoint whose key is not yet live —
+    we only surface a neutral hint, not a red failure.
+    """
     try:
         from idun.providers import complete
         UI.info("Testing connection with a short prompt ...")
@@ -353,8 +357,10 @@ def _wizard_test_call(backend: str) -> None:
         text = getattr(res, "text", "") or ""
         UI.ok(f"Backend responded ({len(text)} chars): {text[:60]!r}")
     except Exception as e:  # noqa: BLE001 - wizard must not crash on a bad key
-        UI.err(f"Test call failed: {e}")
-        UI.info("You can fix credentials later via `idun login` / `idun wizard`.")
+        # Neutral, non-alarming: the wizard already succeeded at writing
+        # config; a failed live probe just means "test later".
+        UI.info(f"Connection not verified yet ({type(e).__name__}). "
+                f"You can test any time with: idun chat \"Hello\"")
 
 
 def cmd_token(args):

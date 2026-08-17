@@ -6,19 +6,22 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://pypi.org/project/idun-sdk/)
 [![stdlib-only](https://img.shields.io/badge/stdlib--only-%E2%9C%93-7c3aed.svg)](https://pypi.org/project/idun-sdk/)
 
-**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 14-provider registry, a 16-bit retro console, and an MCP server that exposes the whole registry.**
+**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 17-provider registry, a 16-bit retro console, and an MCP server that exposes the whole registry.**
 
 Runs headless on Termux/Android with nothing but the Python standard library
 (no `httpx`, no `azure-identity`, no Flask). Idun is a **tool agent** (reasons +
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 (reasoning + tool calls) instead of a black-box answer.
 
-## What's in the box (v1.0)
+## What's in the box (v1.0.7)
 
-- **14-provider registry** over 3 transports (OpenAI-compatible, Anthropic,
+- **`idun welcome`** — a pure-ASCII banner (no external `cmatrix` dependency;
+  the shell is always left usable via a hard terminal reset).
+- **17-provider registry** over 3 transports (OpenAI-compatible, Anthropic,
   Hugging Face). Any OpenAI-compatible endpoint works with zero code changes.
 - **`idun-multi`** — a 16-colour ANSI "16-bit" console with provider switching,
-  credential wizard, model discovery, fallback chains, themes, and a REPL.
+  an **always-exit-able setup wizard** (`idun wizard`: options `1-5`, `s` skip,
+  `q` quit), model discovery, fallback chains, themes, and a REPL.
 - **Config file** `~/.idun/config.toml` as the primary config source
   (env vars still win; registry defaults are the fallback).
 - **Structured output** — `--json` on any command and a `schema` command.
@@ -43,7 +46,7 @@ idun-multi doctor             # env + credential + console-script audit
 ```
 
 ```bash
-idun-multi providers                    # all 14 providers + credential state
+idun-multi providers                    # all 17 providers + credential state
 idun-multi login --provider groq        # hidden prompt -> ~/.idun/groq.token (0600)
 idun-multi ask "explain MoE routing"    # active provider
 idun-multi -p openrouter ask "hi"       # one-off provider
@@ -52,6 +55,29 @@ idun-multi models --discover            # live model list for the active provide
 idun-multi theme c64                     # switch retro palette
 idun-multi doctor                       # env + credential + console-script audit
 ```
+
+### First-run setup wizard
+
+`idun wizard` is an interactive, TTY-only setup helper. It is **always
+exit-able** — at any prompt type `q` (or press Ctrl-C / Ctrl-D) to abort with
+no changes and a clean shell. Options:
+
+```bash
+idun wizard
+```
+
+- `1` Azure · `2` Hugging Face · `3` GitHub Models · `4` OpenAI
+- `5` **other** — ANY OpenAI-compatible endpoint (base URL + key + model),
+  so vendors not in the registry work with zero code changes
+- `s` **skip** — keep registry defaults, only choose a theme
+- `q` **quit** — exit without writing anything
+
+The wizard writes benign settings to `~/.idun/config.toml` (mode 0600) and
+secrets to per-provider `~/.idun/<id>.token` files (mode 0600). A short
+connection probe runs at the end; if it fails (e.g. the key is not live yet)
+the wizard still finishes and just prints a neutral hint — nothing is
+blocked. Non-interactive (piped) invocations exit with a clear message
+instead of hanging.
 
 | Provider | Transport | Credential | Tier |
 |---|---|---|---|
@@ -69,6 +95,9 @@ idun-multi doctor                       # env + credential + console-script audi
 | `hf` | hf inference | `HF_TOKEN` (optional) | free |
 | `ollama` | openai | none (local) | free |
 | `local` | openai | none | free |
+| `perplexity` | openai | `PERPLEXITY_API_KEY` | paid |
+| `fireworks` | openai | `FIREWORKS_API_KEY` | paid |
+| `novita` | openai | `NOVITA_API_KEY` | paid |
 
 **Any OpenAI-compatible endpoint works without code changes** — override per
 provider with `IDUN_<ID>_BASE` and `IDUN_<ID>_MODEL`:
