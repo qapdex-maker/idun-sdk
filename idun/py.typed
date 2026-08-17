@@ -1,0 +1,2 @@
+# Marker for PEP 561: this package ships type hints.
+# Lets downstream mypy/pyright treat idun as a typed package.

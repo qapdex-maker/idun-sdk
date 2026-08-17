@@ -73,7 +73,7 @@ setup(
     },
     packages=find_packages(),
     py_modules=["idun_cli", "idun_mcp", "idun_multi"],
-    package_data={"idun": ["data/*.svg", "data/prompt_packs/*.json", "openapi.json"]},
+    package_data={"idun": ["data/*.svg", "data/prompt_packs/*.json", "openapi.json", "py.typed"]},
     python_requires=">=3.8",
     # stdlib-only: no runtime dependencies. Works headless on Termux.
     install_requires=[],
