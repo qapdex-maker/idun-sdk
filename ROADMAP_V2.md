@@ -1,7 +1,9 @@
 # Idun SDK — Rework Roadmap (v0.2.0 → v1.0)
 
-Status of this document: FINAL. All planned v0.4 / v0.5 / v1.0 items are
-implemented and verified. The SDK is at **v1.0.0**.
+Status of this document: ACTIVE. All planned v0.4 / v0.5 / v1.0 items are
+implemented and verified (SDK at **v1.0.0**). A small post-v1.0 maintenance
+track (v1.0.1 … v1.0.6) captured follow-up fixes that shipped after the
+original "FINAL" sign-off. The backlog in §8 is still future work.
 
 ---
 
@@ -107,6 +109,32 @@ v0.2.5 Nous + resume, v0.2.6 streaming + REPL, v0.2.7 retire backends.py.)
     `getpass`, never argv; token files 0600 in a 0700 dir; error bodies
     redacted before logs; `_require_http_url` SSRF guard (no `file://`); no
     bundled tenant/resource; token inspection secret-free.
+
+---
+
+## 7b. Post-v1.0 maintenance (v1.0.1 → v1.0.6) — DONE
+
+Follow-up fixes that shipped after the original v1.0 sign-off:
+
+1. **Welcome → wizard redirect removed (v1.0.6)** — `idun welcome` no longer
+   auto-launched the interactive setup wizard (the "broken redirect": the
+   banner + cmatrix would drop the user straight into a blocking `input()`
+   prompt they could not exit). `show_welcome_then_wizard()` was deleted;
+   `cmd_welcome` now only renders the banner (cmatrix flourish preserved,
+   guarded by the hard terminal reset) and points the user at `idun wizard`.
+2. **Wizard UX rework (v1.0.6)** — `idun wizard` gained:
+   - **More choice** — added option `5) other` for ANY generic
+     OpenAI-compatible endpoint (base URL + key + model), so non-listed
+     vendors work with zero registry changes.
+   - **Skip** — `s` keeps registry defaults (no provider written); only
+     prompts for the theme.
+   - **Quit** — `q` / empty / Ctrl-C / EOF at any prompt aborts cleanly
+     (rc 0, no config written, shell left usable). The wizard is now
+     exit-able.
+   - **TTY safety** — a piped / non-interactive invocation exits 1 with a
+     clear message instead of hanging on `input()`.
+   Tests: `tests/test_wizard.py` (5 cases) + regression guard in
+   `tests/test_welcome.py`.
 
 ---
 
