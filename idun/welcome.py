@@ -168,8 +168,14 @@ def _hard_reset() -> None:
 
 
 def _print_welcome_art() -> None:
-    """Emit the ASCII banner (own art, not just cmatrix) on a clean screen."""
-    # Guarantee a clean, visible main screen before we draw.
+    """Emit the ASCII banner (own art, not just cmatrix) on a clean screen.
+
+    Everything is left-aligned with a fixed 2-space indent (no terminal-width
+    centring). Centring relies on shutil.get_terminal_size, which in a PTY/SSH
+    often returns 80 even when the visible Termux window is ~50 cols wide —
+    that mismatch is what made the scene look shifted/skew in the screenshot.
+    Left-aligned art stays flush at every width.
+    """
     sys.stdout.write("\033[2J\033[H\033[?25h")
     sys.stdout.write("\n")
     for line in _IDUN_ART.splitlines():
@@ -184,16 +190,15 @@ def _print_welcome_art() -> None:
 
 
 def _print_tree_scene() -> None:
-    """Render the world-tree scene, centred, in brand colours."""
-    # widest line drives centring so nothing goes ragged on narrow Termux
-    widest = max(len(line) for line, _ in _TREE_SCENE)
-    term_w = _term_width()
+    """Render the world-tree scene, left-aligned with a fixed indent.
+
+    Fixed indent (not centred) so the wordmark, tree and subtitle all start on
+    the same column regardless of the (often-wrong) reported terminal width.
+    """
+    indent = "  "  # 2 spaces, matches the wordmark + subtitle indent
     for line, color in _TREE_SCENE:
         code = _COLOR_CODE.get(color, "")
-        pad = max(0, (term_w - len(line)) // 2)
-        # pad to centre; clip the leading pad to the scene width for balance
-        lead = max(0, min(pad, (term_w - widest) // 2 + (widest - len(line)) // 2))
-        sys.stdout.write(" " * lead + code + line + _RESET + "\n")
+        sys.stdout.write(indent + code + line + _RESET + "\n")
 
 
 def show_welcome(force_cmatrix: bool = False) -> None:

@@ -208,8 +208,16 @@ def cmd_hf(args):
 
 
 def cmd_wizard(_args):
-    """Universal first-run setup: picks a backend, captures creds/config,
-    writes ~/.idunrc so every future `idun` call uses it globally."""
+    """Universal first-run setup wizard.
+
+    Picks a backend, captures credentials, lets the user choose a retro theme,
+    writes everything to ``~/.idun/config.toml`` (benign settings) + the
+    per-provider ``.token`` file (secrets, mode 0600), and finally runs a short
+    test call to prove the credentials work before finishing.
+    """
+    from idun import config as C
+    from idun.retro import list_themes
+
     choices = [
         "1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.",
         "2) hf      — Hugging Face Inference API (free tier, needs HF token).",
@@ -222,55 +230,86 @@ def cmd_wizard(_args):
     backend = mapping.get(choice, "azure")
     UI.info(f"Selected: {backend}")
 
-    cfg = {}
+    cfg: dict = {"defaults": {"provider": backend}}
+
     if backend == "azure":
-        UI.err("Azure setup requires a tenant + Foundry resource.")
-        UI.info("Run `idun login --backend azure` and complete the device-code flow.")
-        UI.info("REQUIRED: no tenant ships with this package — point it at yours:")
-        UI.info("  export IDUN_BASE=https://<resource>.services.ai.azure.com")
-        UI.info("  export IDUN_PROJECT=<project>")
-        UI.info("  export IDUN_AGENT=<agent>          # optional")
-        UI.info("  export IDUN_TENANT=<tenant-guid>   # optional")
-        cfg["IDUN_BACKEND"] = "azure"
+        UI.info("Azure setup: point the SDK at YOUR tenant + Foundry resource.")
+        base = input("IDUN_BASE (https://<resource>.services.ai.azure.com): ").strip()
+        if base:
+            os.environ["IDUN_BASE"] = base
+            cfg["defaults"]["base"] = base
+        project = input("IDUN_PROJECT (Foundry project name) [optional]: ").strip()
+        if project:
+            cfg["defaults"]["project"] = project
+        tenant = input("IDUN_TENANT (tenant guid) [optional]: ").strip()
+        if tenant:
+            cfg["defaults"]["tenant"] = tenant
+        UI.info("Run `idun login --backend azure` to complete the device-code flow.")
     elif backend == "hf":
         tok = input("Hugging Face token (hf_...) [or blank for anonymous]: ").strip()
         if tok:
             _save_backend_token("hf", tok)
         model = input(f"HF model [default: {get_provider('hf').default_model}]: ").strip()
         if model:
-            cfg["HF_MODEL"] = model
-        cfg["IDUN_BACKEND"] = "hf"
+            cfg["hf"] = {"model": model}
     elif backend == "github":
         tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
         if not tok:
-            sys.exit("GitHub backend requires a PAT. Aborting.")
+            UI.err("GitHub backend requires a PAT. Aborting.")
+            return 1
         _save_backend_token("openai", tok)
         model = input(f"GitHub model [default: {get_provider('openai').default_model}]: ").strip()
         if model:
-            cfg["GITHUB_MODEL"] = model
-        cfg["IDUN_BACKEND"] = "github"
+            cfg["openai"] = {"model": model}
     elif backend == "openai":
         tok = input("OpenAI API key (sk-...) [or blank for OPENAI_API_KEY env]: ").strip()
         if tok:
             _save_backend_token("openai", tok)
         model = input(f"OpenAI model [default: {get_provider('openai').default_model}]: ").strip()
         if model:
-            cfg["OPENAI_MODEL"] = model
+            cfg["openai"] = dict(cfg.get("openai", {}), model=model)
         base = input(f"OpenAI base URL [default: {get_provider('openai').base}]: ").strip()
         if base:
-            cfg["OPENAI_BASE"] = base
-        cfg["IDUN_BACKEND"] = "openai"
+            cfg["openai"] = dict(cfg.get("openai", {}), base=base)
 
-    # write ~/.idunrc (shell env file)
-    rc = os.path.join(os.path.expanduser("~"), ".idunrc")
-    with open(rc, "a", encoding="utf-8") as f:
-        f.write("\n# idun wizard config\n")
-        for k, v in cfg.items():
-            f.write(f"export {k}={v}\n")
-    os.chmod(rc, 0o600)
-    UI.ok(f"Wrote config to {rc}")
-    UI.info("Source it once:  source ~/.idunrc   (or restart your shell)")
-    UI.info('Then:  idun chat "Hello"  (uses the configured backend)')
+    # theme pick
+    themes = list_themes()
+    UI.info("Retro themes: " + ", ".join(themes))
+    theme = input("Theme [default: classic]: ").strip().lower()
+    if theme and theme in themes:
+        cfg["defaults"]["theme"] = theme
+        try:
+            from idun.retro import set_theme
+            set_theme(theme)
+        except Exception:
+            pass
+
+    # write config.toml (benign settings only; secrets live in the .token file)
+    path = C.write_config(cfg)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    UI.ok(f"Wrote config -> {path}")
+
+    # smoke test to prove the credentials work
+    _wizard_test_call(backend)
+    UI.info('Done. Try:  idun chat "Hello"')
+    return 0
+
+
+def _wizard_test_call(backend: str) -> None:
+    """Best-effort smoke test of the chosen backend; never raises."""
+    try:
+        from idun.providers import complete
+        UI.info("Testing connection with a short prompt ...")
+        res = complete(backend, "Reply with the single word: OK", model="",
+                       system="", timeout=20)
+        text = getattr(res, "text", "") or ""
+        UI.ok(f"Backend responded ({len(text)} chars): {text[:60]!r}")
+    except Exception as e:  # noqa: BLE001 - wizard must not crash on a bad key
+        UI.err(f"Test call failed: {e}")
+        UI.info("You can fix credentials later via `idun login` / `idun wizard`.")
 
 
 def cmd_token(args):

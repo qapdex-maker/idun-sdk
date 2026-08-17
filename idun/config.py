@@ -178,8 +178,75 @@ def config_theme() -> str:
     return ""
 
 
+def _escape_scalar(val) -> str:
+    """Render a Python scalar as a TOML literal (subset)."""
+    if isinstance(val, bool):
+        return "true" if val else "false"
+    if isinstance(val, (int, float)):
+        return str(val)
+    s = str(val)
+    s = s.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{s}"'
+
+
+def _dump_toml(cfg: dict) -> str:
+    """Serialize the config subset back to TOML text."""
+    lines = []
+    # top-level scalars first (e.g. none here, but keep order stable)
+    for key, val in cfg.items():
+        if isinstance(val, dict):
+            continue
+        lines.append(f"{key} = {_escape_scalar(val)}")
+    for section, body in cfg.items():
+        if not isinstance(body, dict):
+            continue
+        lines.append("")
+        lines.append(f"[{section}]")
+        for k, v in body.items():
+            lines.append(f"{k} = {_escape_scalar(v)}")
+    return "\n".join(lines) + "\n"
+
+
+def write_config(cfg: dict, path: str | None = None) -> str:
+    """Merge ``cfg`` into the config file and return its path.
+
+    Reads the existing file (if any), applies updates, writes back. The config
+    dir is created 0700. Secrets should go to the per-provider ``.token`` file
+    via ``save_credential`` — this only stores benign settings (provider, theme,
+    model, base).
+    """
+    path = path or CONFIG_PATH
+    d = os.path.dirname(path)
+    try:
+        os.makedirs(d, mode=0o700, exist_ok=True)
+    except OSError:
+        pass
+    merged: dict = {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            merged = _parse_toml(fh.read())
+    except OSError:
+        pass
+    for key, val in cfg.items():
+        if isinstance(val, dict) and isinstance(merged.get(key), dict):
+            merged[key].update(val)
+        else:
+            merged[key] = val
+    text = _dump_toml(merged)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    # invalidate the read cache so subsequent lookups see the new file
+    global _cache
+    _cache = None
+    return path
+
+
 __all__ = [
-    "CONFIG_PATH", "load_config", "reload",
+    "CONFIG_PATH", "load_config", "reload", "write_config",
     "config_provider_model", "config_provider_base",
     "config_provider_key", "config_default_provider", "config_theme",
 ]
