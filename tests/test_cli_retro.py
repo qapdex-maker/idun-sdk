@@ -32,8 +32,9 @@ def test_chat_out_writes_to_stderr(capsys):
 def test_idun_status_respects_idun_backend_env(monkeypatch, capsys):
     monkeypatch.setenv("IDUN_BACKEND", "hf")
     monkeypatch.delenv("IDUN_PROVIDER", raising=False)
-    # avoid touching the real token file
-    monkeypatch.setattr(cli.backends, "load_hf_token", lambda: "tok")
+    # avoid touching the real token file; patch the provider-registry helper
+    from idun import providers as P
+    monkeypatch.setattr(P, "credential_status", lambda p: "present")
     cli.cmd_status(type("A", (), {})())
     err = capsys.readouterr().err
     assert "hf" in err

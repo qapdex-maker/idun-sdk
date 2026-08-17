@@ -22,8 +22,15 @@ from idun import IdunClient, login as do_login, load_token, logo_path
 from idun.client import IdunResult
 from idun.auth import maybe_refresh, _load_meta, REFRESH_SLACK
 from idun.welcome import maybe_welcome, show_welcome
-from idun import backends
+from idun.providers import get_provider, save_credential
 from idun import _cli_retro as UI
+
+
+def _save_backend_token(backend: str, token: str) -> str:
+    """Persist a non-azure backend key via the provider registry (~/.idun/<id>.token)."""
+    pid = "openai" if backend == "github" else backend
+    path = save_credential(get_provider(pid), token)
+    return path
 
 
 
@@ -71,16 +78,14 @@ def cmd_login(args):
     if backend == "hf":
         tok = input("Hugging Face token (hf_...): ").strip()
         if tok:
-            from idun.backends import save_hf_token
-            save_hf_token(tok)
-            UI.ok("saved -> ~/hf_token.txt")
+            _save_backend_token("hf", tok)
+            UI.ok("saved -> ~/.idun/hf.token")
         return
     if backend == "github":
         tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
         if tok:
-            from idun.backends import save_github_token
-            save_github_token(tok)
-            UI.ok("saved -> ~/github_token.txt")
+            _save_backend_token("openai", tok)
+            UI.ok("saved -> ~/.idun/openai.token")
         return
     sys.exit(f"login not supported for backend {backend!r}")
 
@@ -122,7 +127,7 @@ def cmd_welcome(_args):
 
 
 def cmd_status(_args):
-    from idun import backends as be
+    from idun.providers import credential_status
     backend = os.environ.get("IDUN_BACKEND",
                 os.environ.get("IDUN_PROVIDER", "azure"))
     lines = [("active backend", backend)]
@@ -130,19 +135,15 @@ def cmd_status(_args):
         meta = _load_meta()
         ok = bool(meta and meta.get("access_token"))
         lines.append(("azure token", "present" if ok else "MISSING (~/foundry_token.txt)"))
-    elif backend == "hf":
-        tok = be.load_hf_token()
-        lines.append(("hf token", "present" if tok else "MISSING"))
-        lines.append(("hf model", os.environ.get("HF_MODEL") or be.HF_DEFAULT_MODEL))
-    elif backend == "github":
-        tok = be.load_github_token()
-        lines.append(("github token", "present" if tok else "MISSING"))
-        lines.append(("gh model", os.environ.get("GITHUB_MODEL") or be.GITHUB_DEFAULT_MODEL))
-    elif backend == "openai":
-        tok = be.load_openai_token()
-        lines.append(("openai token", "present" if tok else "MISSING"))
-        lines.append(("openai model", os.environ.get("OPENAI_MODEL") or be.OPENAI_DEFAULT_MODEL))
-        lines.append(("openai base", os.environ.get("OPENAI_BASE") or be.OPENAI_DEFAULT_BASE))
+    elif backend in ("hf", "github", "openai"):
+        pid = "openai" if backend == "github" else backend
+        p = get_provider(pid)
+        status = credential_status(p)
+        lines.append((f"{backend} token", status))
+        lines.append((f"{backend} model", os.environ.get(
+            f"{backend.upper()}_MODEL", p.resolved_model())))
+        if backend == "openai":
+            lines.append(("openai base", os.environ.get("OPENAI_BASE") or p.resolved_base()))
     UI.status_out(backend, lines)
 
 
@@ -233,9 +234,8 @@ def cmd_wizard(_args):
     elif backend == "hf":
         tok = input("Hugging Face token (hf_...) [or blank for anonymous]: ").strip()
         if tok:
-            from idun.backends import save_hf_token
-            save_hf_token(tok)
-        model = input(f"HF model [default: {backends.HF_DEFAULT_MODEL}]: ").strip()
+            _save_backend_token("hf", tok)
+        model = input(f"HF model [default: {get_provider('hf').default_model}]: ").strip()
         if model:
             cfg["HF_MODEL"] = model
         cfg["IDUN_BACKEND"] = "hf"
@@ -243,21 +243,19 @@ def cmd_wizard(_args):
         tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
         if not tok:
             sys.exit("GitHub backend requires a PAT. Aborting.")
-        from idun.backends import save_github_token
-        save_github_token(tok)
-        model = input(f"GitHub model [default: {backends.GITHUB_DEFAULT_MODEL}]: ").strip()
+        _save_backend_token("openai", tok)
+        model = input(f"GitHub model [default: {get_provider('openai').default_model}]: ").strip()
         if model:
             cfg["GITHUB_MODEL"] = model
         cfg["IDUN_BACKEND"] = "github"
     elif backend == "openai":
         tok = input("OpenAI API key (sk-...) [or blank for OPENAI_API_KEY env]: ").strip()
         if tok:
-            from idun.backends import save_openai_token
-            save_openai_token(tok)
-        model = input(f"OpenAI model [default: {backends.OPENAI_DEFAULT_MODEL}]: ").strip()
+            _save_backend_token("openai", tok)
+        model = input(f"OpenAI model [default: {get_provider('openai').default_model}]: ").strip()
         if model:
             cfg["OPENAI_MODEL"] = model
-        base = input(f"OpenAI base URL [default: {backends.OPENAI_DEFAULT_BASE}]: ").strip()
+        base = input(f"OpenAI base URL [default: {get_provider('openai').base}]: ").strip()
         if base:
             cfg["OPENAI_BASE"] = base
         cfg["IDUN_BACKEND"] = "openai"

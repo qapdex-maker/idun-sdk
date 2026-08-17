@@ -348,6 +348,103 @@ def _sanitize_error_body(body: str) -> str:
     return body
 
 
+# --------------------------------------------------------------------------
+# Response cache (v0.4) — content-addressed, opt-out via IDUN_NO_CACHE.
+# --------------------------------------------------------------------------
+
+CACHE_DIR = os.path.join(CONFIG_DIR, "cache")
+CACHE_MAX_AGE_S = int(os.environ.get("IDUN_CACHE_MAX_AGE", "86400"))  # 24h
+
+
+def _cache_key(pid: str, model: str, prompt: str, system: str,
+               history: list | None, temperature: float, max_tokens: int) -> str:
+    import hashlib
+    payload = json.dumps(
+        {
+            "pid": pid, "model": model, "prompt": prompt, "system": system,
+            "history": history or [], "temperature": temperature,
+            "max_tokens": max_tokens,
+        },
+        sort_keys=True, ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _cache_path(key: str) -> str:
+    return os.path.join(CACHE_DIR, f"{key}.json")
+
+
+def cache_get(key: str):
+    """Return the cached Completion dict for ``key`` or None (miss/expired)."""
+    if os.environ.get("IDUN_NO_CACHE"):
+        return None
+    path = _cache_path(key)
+    try:
+        with open(path, encoding="utf-8") as fh:
+            rec = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    age = time.time() - rec.get("ts", 0)
+    if age > CACHE_MAX_AGE_S:
+        return None
+    return rec.get("data")
+
+
+def cache_put(key: str, data: dict) -> None:
+    """Persist a Completion-like dict under ``key`` (best-effort)."""
+    if os.environ.get("IDUN_NO_CACHE"):
+        return
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(_cache_path(key), "w", encoding="utf-8") as fh:
+            json.dump({"ts": time.time(), "data": data}, fh)
+    except OSError:
+        pass
+
+
+# --------------------------------------------------------------------------
+# Retry with backoff (v0.4) — honors Retry-After, capped exponential + jitter.
+# --------------------------------------------------------------------------
+
+_RETRYABLE = {429, 500, 502, 503, 504}
+
+
+def _backoff_sleep(attempt: int, retry_after: float | None) -> float:
+    """Seconds to wait before retry ``attempt`` (0-based)."""
+    if retry_after is not None:
+        return retry_after
+    # exponential 1,2,4,8... capped at 30s, with up to 250ms jitter
+    import random
+    base = min(30.0, 2.0 ** attempt)
+    return base + random.uniform(0, 0.25)
+
+
+def with_retry(fn, *, retries: int = 3):
+    """Call ``fn``; on retryable HTTPError back off and retry (honors Retry-After).
+
+    Non-retryable errors (4xx != 429, transport failure) propagate immediately.
+    Returns whatever ``fn`` returns.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except urllib.error.HTTPError as e:
+            if e.code not in _RETRYABLE or attempt == retries:
+                raise
+            retry_after = None
+            try:
+                ra = e.headers.get("Retry-After") if e.headers else None
+                if ra:
+                    retry_after = float(ra)
+            except (TypeError, ValueError):
+                retry_after = None
+            last_exc = e
+            time.sleep(_backoff_sleep(attempt, retry_after))
+    # unreachable when retries >= 0, but keep mypy happy
+    raise last_exc or RuntimeError("retry loop exited without result")
+
+
 def _post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
     _require_http_url(url)
     req = urllib.request.Request(
@@ -546,7 +643,8 @@ _TRANSPORTS = {
 def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
              temperature: float = 0.7, max_tokens: int = 1024,
              timeout: int = 120, history: list[dict] | None = None,
-             stream: bool = False):
+             stream: bool = False, no_cache: bool = False,
+             retries: int = 3):
     """Send one prompt to a provider and return a normalized Completion.
 
     ``history`` is an optional list of prior ``{"role", "content"}`` turns; when
@@ -556,7 +654,13 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
     Completion: it yields text chunks (``str``) as they arrive over SSE. Only
     the ``openai`` transport supports streaming today; every other transport
     falls back to a single-chunk yield of the full response so callers can rely
-    on the same interface.
+    on the same interface. Streamed responses are never cached.
+
+    Caching: identical (provider, model, prompt, system, history, temperature,
+    max_tokens) requests hit ``~/.idun/cache`` for up to ``IDUN_CACHE_MAX_AGE``
+    seconds. Pass ``no_cache=True`` or set ``IDUN_NO_CACHE`` to bypass.
+    Retries: on HTTP 429/5xx the call backs off (honoring ``Retry-After``), up
+    to ``retries`` attempts, before giving up.
 
     Raises RuntimeError on missing credentials or transport failure.
     """
@@ -581,6 +685,23 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
         return Completion(text=text, model=model, provider=p.id,
                           raw={"steps": len(getattr(res, "steps", []))})
 
+    # Cache lookup (non-stream only; streaming is not cached).
+    cache_key = None
+    if not stream and not no_cache:
+        cache_key = _cache_key(p.id, model, prompt, system,
+                               history, temperature, max_tokens)
+        cached = cache_get(cache_key)
+        if cached is not None:
+            return Completion(
+                text=cached.get("text", ""),
+                model=cached.get("model", model),
+                provider=cached.get("provider", p.id),
+                prompt_tokens=cached.get("prompt_tokens", 0),
+                completion_tokens=cached.get("completion_tokens", 0),
+                latency_ms=cached.get("latency_ms", 0),
+                raw=cached.get("raw", {}) or {},
+            )
+
     if stream and p.transport == "openai":
         messages = _build_messages(system, prompt, history)
         return _stream_openai(p, model, token, messages, temperature,
@@ -591,9 +712,13 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
         raise RuntimeError(f"{p.id}: unsupported transport {p.transport!r}")
 
     started = time.time()
-    data = caller(p, prompt, model, token, system=system,
-                  temperature=temperature, max_tokens=max_tokens,
-                  timeout=timeout, history=history)
+    # Retry on transient 429/5xx (honors Retry-After) before surfacing failure.
+    data = with_retry(
+        lambda: caller(p, prompt, model, token, system=system,
+                       temperature=temperature, max_tokens=max_tokens,
+                       timeout=timeout, history=history),
+        retries=retries,
+    )
     latency = int((time.time() - started) * 1000)
     ptok, ctok = _extract_usage(p.transport, data)
     completion = Completion(
@@ -602,6 +727,14 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
         completion_tokens=ctok, latency_ms=latency,
         raw=data if isinstance(data, dict) else {},
     )
+    if cache_key is not None:
+        cache_put(cache_key, {
+            "text": completion.text, "model": completion.model,
+            "provider": completion.provider,
+            "prompt_tokens": completion.prompt_tokens,
+            "completion_tokens": completion.completion_tokens,
+            "latency_ms": completion.latency_ms, "raw": completion.raw,
+        })
     if not stream:
         return completion
     # non-streaming transports: expose the same generator interface so callers
@@ -609,6 +742,36 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
     def _single():
         yield completion.text
     return _single()
+
+
+def extract_last_user(messages: list) -> str:
+    """Pull the last user turn out of a Foundry-style message-list.
+
+    Accepts either a plain string or a list of ``{"role", "content"}`` dicts
+    (content may be a string or a list of ``{"type": "input_text",
+    "text": ...}`` blocks). Returns the last user text, or the raw string
+    form as a fallback. Used by the legacy ``IdunClient.complete_messages``
+    path, which flattens multi-turn lists to a single prompt for the
+    single-turn external backends.
+    """
+    if isinstance(messages, str):
+        return messages
+    if not isinstance(messages, list):
+        return str(messages)
+    for m in reversed(messages):
+        if not isinstance(m, dict):
+            continue
+        if m.get("role") != "user":
+            continue
+        content = m.get("content", "")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            for c in content:
+                if isinstance(c, dict) and c.get("type") == "input_text":
+                    return c.get("text", "")
+    # fallback: first available text
+    return str(messages)
 
 
 def default_provider() -> str:

@@ -18,7 +18,8 @@ import json
 import os
 import time
 
-from . import backends as _be
+from . import providers as _pr
+from .providers import get_provider, resolve_credential
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -215,19 +216,28 @@ class IdunClient:
         openai_base: Optional[str] = None,
     ) -> None:
         # --- backend selection (multi-backend support) ---
+        # The provider registry in providers.py is the single source of truth.
+        # 'github' is a legacy alias for the openai transport.
         self.backend = (backend or os.environ.get("IDUN_BACKEND", "azure")).strip().lower()
-        if self.backend not in _be.VALID_BACKENDS:
+        try:
+            self._provider = get_provider(self.backend)
+        except ValueError:
+            valid = ", ".join(sorted(p.id for p in _pr.list_providers()))
             raise ValueError(
-                f"IDUN_BACKEND={self.backend!r} invalid; "
-                f"choose one of {_be.VALID_BACKENDS}")
-        # external-backend credentials/models (env-overridable)
-        self.hf_token = hf_token if hf_token is not None else _be.load_hf_token()
-        self.hf_model = hf_model or os.environ.get("HF_MODEL") or _be.HF_DEFAULT_MODEL
-        self.github_token = github_token if github_token is not None else _be.load_github_token()
-        self.github_model = github_model or os.environ.get("GITHUB_MODEL") or _be.GITHUB_DEFAULT_MODEL
-        self.openai_token = openai_token if openai_token is not None else _be.load_openai_token()
-        self.openai_model = openai_model or os.environ.get("OPENAI_MODEL") or _be.OPENAI_DEFAULT_MODEL
-        self.openai_base = openai_base or os.environ.get("OPENAI_BASE") or _be.OPENAI_DEFAULT_BASE
+                f"IDUN_BACKEND={self.backend!r} invalid; choose one of {valid}") from None
+        # external-backend credentials/models (env-overridable). Explicit
+        # constructor args win over env over ~/.idun/<id>.token (0600).
+        p = self._provider
+        if p.id == "hf":
+            self.hf_token = hf_token if hf_token is not None else resolve_credential(p)
+            self.hf_model = hf_model or os.environ.get("HF_MODEL") or p.resolved_model()
+        elif p.id == "openai" or p.id == "github":
+            self.openai_token = openai_token if openai_token is not None else resolve_credential(p)
+            self.openai_model = openai_model or os.environ.get("OPENAI_MODEL") or p.resolved_model()
+            self.openai_base = openai_base or os.environ.get("OPENAI_BASE") or p.resolved_base()
+        # github is served through the openai transport under the openai id
+        if self.backend == "github":
+            self.backend = "openai"
         # --- azure config: explicit arg > environment > (no tenant default) ---
         self.token = token or os.environ.get("FOUNDRY_TOKEN")
         self.base = (base if base is not None else foundry_base()).rstrip("/")
@@ -320,15 +330,14 @@ class IdunClient:
         so `steps` is empty and `model` is the backend model id.
         """
         if self.backend != "azure":
-            text, model = _be.run_external(
+            comp = _pr.complete(
                 self.backend, prompt,
-                hf_token=self.hf_token, hf_model=self.hf_model,
-                github_token=self.github_token, github_model=self.github_model,
-                openai_token=self.openai_token, openai_model=self.openai_model,
-                openai_base=self.openai_base,
-                timeout=self.timeout, max_tokens=max_output_tokens,
+                model=self.hf_model if self.backend == "hf" else self.openai_model,
+                max_tokens=max_output_tokens,
+                timeout=self.timeout,
+                stream=False,
             )
-            return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})
+            return IdunResult(text=comp.text, steps=[], model=comp.model, raw={"backend": self.backend})
 
         from .auth import maybe_refresh  # lazy import keeps install_requires=[]
 
@@ -362,7 +371,7 @@ class IdunClient:
         turn (those backends are single-turn text), preserving the same API.
         """
         if self.backend != "azure":
-            prompt = _be._extract_last_user(messages)
+            prompt = _pr.extract_last_user(messages)
             return self.complete(prompt, max_output_tokens)
 
         from .auth import maybe_refresh
@@ -424,14 +433,13 @@ class IdunClient:
             loop = asyncio.get_running_loop()
             from functools import partial
             fn = partial(
-                _be.run_external, self.backend, prompt,
-                hf_token=self.hf_token, hf_model=self.hf_model,
-                github_token=self.github_token, github_model=self.github_model,
-                openai_token=self.openai_token, openai_model=self.openai_model,
-                openai_base=self.openai_base,
-                timeout=self.timeout, max_tokens=max_output_tokens)
-            text, model = await loop.run_in_executor(None, fn)
-            return IdunResult(text=text, steps=[], model=model, raw={"backend": self.backend})
+                _pr.complete, self.backend, prompt,
+                model=self.hf_model if self.backend == "hf" else self.openai_model,
+                max_tokens=max_output_tokens,
+                timeout=self.timeout, stream=False,
+            )
+            comp = await loop.run_in_executor(None, fn)
+            return IdunResult(text=comp.text, steps=[], model=comp.model, raw={"backend": self.backend})
 
         from .auth import maybe_refresh  # lazy import keeps install_requires=[]
 

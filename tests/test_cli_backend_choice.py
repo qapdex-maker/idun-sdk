@@ -57,8 +57,8 @@ def test_login_without_flag_uses_idun_backend(monkeypatch, capsys):
     monkeypatch.setenv("IDUN_BACKEND", "hf")
     monkeypatch.setattr("sys.stdin", io.StringIO("hf_test_tok\n"))
     called = {}
-    monkeypatch.setattr(cli.backends, "save_hf_token",
-                        lambda tok: called.setdefault("tok", tok))
+    monkeypatch.setattr(cli, "save_credential",
+                        lambda p, tok: called.setdefault("tok", tok))
     # azure do_login must NOT run for hf
     monkeypatch.setattr(cli, "do_login",
                         lambda: (_ for _ in ()).throw(
