@@ -187,3 +187,10 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
 5. **Vision + function calling** — DONE in v1.0.12 (`complete(images=...,
    tools=...)` wired through the `openai` + `anthropic` transports;
    `Completion.tool_calls`; CLI `--image`/`--tools`/`--tool-choice`).
+6. **`idun chat` live session** — DONE in v1.0.14 (`idun chat` with no prompt
+   prints an "IDUN ONLINE" console header and drops into a REPL instead of
+   dumping the argparse error; `exit`/`quit`/`q`/Ctrl-C ends cleanly).
+
+> §8 is now **fully shipped** (v1.0.6 → v1.0.14). The SDK is feature-complete
+> for the v1.0.x line. Release-by-release detail lives in
+> [CHANGELOG.md](./CHANGELOG.md); this document is the planning record.

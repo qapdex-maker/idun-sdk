@@ -1,7 +1,11 @@
 # Idun Roadmap
 
-Status quo, nahe, mittelfristige und Vision-Ziele für das Idun-Projekt
-(SDK + Playground + Docs + Quality-Gate + WebUI).
+> **DEPRECATED — this file is historical (v0.1.x era).** The current,
+> maintained planning record is **[ROADMAP_V2.md](./ROADMAP_V2.md)** (v0.2.0 →
+> v1.0.14, §8 fully shipped). Release-by-release detail is in
+> [CHANGELOG.md](./CHANGELOG.md). Kept for archive/history only.
+
+Status quo, nahe, mittelfristige und Vision-Ziele (Stand v0.1.x, archiviert):
 
 ## Status quo (erledigt, live auf GitHub / PyPI)
 
