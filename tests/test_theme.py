@@ -41,7 +41,6 @@ def test_env_theme_applied_at_import(monkeypatch):
     # re-import to trigger _apply_env_theme with the env var set
     import sys
     sys.modules.pop("idun.retro", None)
-    import importlib
     R2 = importlib.import_module("idun.retro")
     try:
         assert R2.theme() == "c64"
