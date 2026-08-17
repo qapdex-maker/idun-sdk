@@ -22,6 +22,7 @@ import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from idun.client import IdunClient
+from idun import providers as P
 
 
 TOOLS = [
@@ -109,6 +110,50 @@ TOOLS = [
             "properties": {},
         },
     },
+    {
+        "name": "idun_providers",
+        "description": (
+            "List every provider in the Idun registry: id, label, transport, "
+            "credential state and tier."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "idun_ask",
+        "description": (
+            "Send one prompt to ANY provider in the registry (not just the "
+            "Azure agent) and return the normalized completion."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "The prompt to send."},
+                "provider": {"type": "string",
+                             "description": "Provider id (e.g. groq). Defaults to active."},
+                "model": {"type": "string", "description": "Model id override."},
+                "system": {"type": "string", "description": "System prompt."},
+                "max_tokens": {"type": "integer", "default": 1024},
+            },
+            "required": ["prompt"],
+        },
+    },
+    {
+        "name": "idun_race",
+        "description": (
+            "Fan one prompt at several providers and return latency + preview "
+            "+ error state for each."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string", "description": "The prompt."},
+                "providers": {"type": "string",
+                              "description": "Comma-separated provider ids."},
+                "max_tokens": {"type": "integer", "default": 512},
+            },
+            "required": ["prompt"],
+        },
+    },
 ]
 
 
@@ -165,6 +210,55 @@ def _tool_run(pack, key=None, keys=None, all_pack=False):
     # single-key path
     prompt = get_prompt(pack, key)
     return _tool_chat(prompt)
+
+
+def _tool_providers():
+    """List all registry providers with credential + tier state."""
+    rows = []
+    for p in P.list_providers():
+        cred = P.credential_status(p)
+        rows.append({
+            "id": p.id,
+            "label": p.label,
+            "transport": p.transport,
+            "tier": "free" if p.free_tier else "paid",
+            "credential": cred,
+            "default_model": p.resolved_model(),
+        })
+    return rows
+
+
+def _tool_ask(prompt, provider=None, model="", system="", max_tokens=1024):
+    """Run one prompt through the multi-provider registry (any backend)."""
+    pid = provider or P.default_provider()
+    comp = P.complete(pid, prompt, model=model or "", system=system or "",
+                      max_tokens=int(max_tokens))
+    return comp.to_dict()
+
+
+def _tool_race(prompt, providers=None, max_tokens=512):
+    """Fan a prompt at several providers; return latency + preview + state."""
+    if providers:
+        pids = [x.strip() for x in providers.split(",") if x.strip()]
+    else:
+        pids = [p.id for p in P.list_providers()
+                if P.credential_status(p) != "none"
+                and p.transport != "azure"]
+    out = []
+    for pid in pids:
+        try:
+            comp = P.complete(pid, prompt, max_tokens=int(max_tokens))
+            out.append({
+                "provider": pid,
+                "state": "ok",
+                "latency_ms": comp.latency_ms,
+                "tokens": comp.total_tokens,
+                "model": comp.model,
+                "preview": comp.text.strip().split("\n")[0][:160],
+            })
+        except (RuntimeError, ValueError) as e:
+            out.append({"provider": pid, "state": "error", "error": str(e)[:200]})
+    return out
 
 
 def _tool_token():
@@ -235,6 +329,21 @@ def _dispatch(req):
                 content = [{"type": "text", "text": str(out)}]
             elif name == "idun_token":
                 out = _tool_token()
+                content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
+            elif name == "idun_providers":
+                out = _tool_providers()
+                content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
+            elif name == "idun_ask":
+                out = _tool_ask(args.get("prompt", ""),
+                                provider=args.get("provider"),
+                                model=args.get("model", ""),
+                                system=args.get("system", ""),
+                                max_tokens=args.get("max_tokens", 1024))
+                content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
+            elif name == "idun_race":
+                out = _tool_race(args.get("prompt", ""),
+                                providers=args.get("providers"),
+                                max_tokens=args.get("max_tokens", 512))
                 content = [{"type": "text", "text": json.dumps(out, ensure_ascii=False, indent=2)}]
             else:
                 raise ValueError(f"unknown tool: {name}")
