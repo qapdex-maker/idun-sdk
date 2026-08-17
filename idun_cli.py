@@ -21,7 +21,7 @@ import time
 from idun import IdunClient, login as do_login, load_token, logo_path
 from idun.client import IdunResult
 from idun.auth import maybe_refresh, _load_meta, REFRESH_SLACK
-from idun.welcome import maybe_welcome, show_welcome
+from idun.welcome import maybe_welcome
 from idun.providers import get_provider, save_credential
 from idun import _cli_retro as UI
 
@@ -123,7 +123,8 @@ def cmd_openapi(args):
 
 
 def cmd_welcome(_args):
-    show_welcome(force_cmatrix=True)
+    from idun.welcome import show_welcome_then_wizard
+    return show_welcome_then_wizard(_args)
 
 
 def cmd_status(_args):
