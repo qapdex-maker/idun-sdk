@@ -1028,5 +1028,58 @@ __all__ = [
     "Provider", "Completion", "REGISTRY", "list_providers", "get_provider",
     "resolve_credential", "save_credential", "credential_status", "complete",
     "complete_chain", "discover_models", "default_provider", "CONFIG_DIR",
-    "replace",
+    "support_matrix", "replace",
 ]
+
+
+# --------------------------------------------------------------------------
+# Capability matrix (SUPPORT_MATRIX docs)
+# --------------------------------------------------------------------------
+#
+# These flags are derived from the actual transports in this file so the
+# docs can never drift from the code. "streaming" means true SSE token
+# streaming (openai transport); azure answers in one chunk via the agent
+# client; anthropic/hf fall back to a single-chunk yield. "tools" means the
+# SDK surfaces an agent tool trace (only the Azure tool-agent does). "vision"
+# is not wired into `complete()` for any provider yet. "json_mode" follows the
+# same rule as `cmd_schema` (openai + azure transports send response_format).
+_SUPPORT_STREAMING = {"openai", "azure"}        # True SSE / single-chunk-yield
+_SUPPORT_JSONMODE = {"openai", "azure"}         # response_format accepted
+_SUPPORT_TOOLS = {"azure"}                       # agent tool trace surfaced
+_SUPPORT_VISION = set()                          # not implemented in `complete()`
+
+
+def support_matrix() -> list[dict]:
+    """Return the per-provider capability matrix (drives `idun-multi support`
+    and the SUPPORT_MATRIX.md doc). Honest: flags come from the transports
+    actually implemented in this module, not from provider marketing.
+    """
+    rows = []
+    for p in REGISTRY:
+        t = p.transport
+        rows.append({
+            "id": p.id,
+            "label": p.label,
+            "transport": t,
+            "streaming": t in _SUPPORT_STREAMING,
+            "tools": t in _SUPPORT_TOOLS,
+            "vision": t in _SUPPORT_VISION,
+            "json_mode": t in _SUPPORT_JSONMODE,
+        })
+    return rows
+
+
+def support_matrix_text() -> str:
+    """Render the capability matrix as a Markdown table (no secrets)."""
+    rows = support_matrix()
+    head = ("| Provider | Transport | Streaming | Tools | Vision | JSON mode |\n"
+            "|---|---|---|---|---|---|")
+    lines = [head]
+    for r in rows:
+        def _mark(b: bool) -> str:
+            return "✓" if b else "—"
+        lines.append(
+            f"| `{r['id']}` | {r['transport']} | {_mark(r['streaming'])} | "
+            f"{_mark(r['tools'])} | {_mark(r['vision'])} | {_mark(r['json_mode'])} |"
+        )
+    return "\n".join(lines)

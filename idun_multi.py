@@ -573,6 +573,25 @@ def cmd_schema(args) -> int:
     return 0
 
 
+def cmd_support(_args) -> int:
+    """Print the per-provider capability matrix (streaming / tools / vision /
+    JSON mode). The flags are derived from the transports actually implemented
+    in the SDK, so the table never drifts from the code.
+    """
+    from idun.providers import support_matrix_text
+    print(R.header("IDUN SUPPORT MATRIX", "per-provider capabilities"))
+    print()
+    print(support_matrix_text())
+    print()
+    print(R.paint("streaming: true SSE (openai); azure = single chunk via agent "
+                  "client; anthropic/hf = single-chunk fallback", "dim"))
+    print(R.paint("tools: agent tool-trace surfaced (azure tool-agent only)", "dim"))
+    print(R.paint("vision: not wired into complete() for any provider yet", "dim"))
+    print(R.paint("json_mode: response_format accepted by openai + azure transports",
+                  "dim"))
+    return 0
+
+
 def cmd_theme(args) -> int:
     """Show or switch the active retro theme (classic/c64/gameboy/amiga/cga)."""
     if getattr(args, "name", ""):
@@ -674,6 +693,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("schema", help="show the JSON response schema")
     sp.set_defaults(func=cmd_schema)
+
+    sp = sub.add_parser("support", help="show the per-provider capability matrix")
+    sp.set_defaults(func=cmd_support)
 
     sp = sub.add_parser("theme", help="show or switch the retro theme")
     sp.add_argument("name", nargs="?", default="",

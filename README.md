@@ -54,6 +54,7 @@ idun-multi race "Name one planet."      # fan one prompt at every ready provider
 idun-multi models --discover            # live model list for the active provider
 idun-multi theme c64                     # switch retro palette
 idun-multi doctor                       # env + credential + console-script audit
+idun-multi support                      # per-provider capability matrix
 ```
 
 ### First-run setup wizard
@@ -170,6 +171,14 @@ response schema per provider, including whether `json_mode` is supported:
 ```bash
 idun-multi ask "What is a MoE?" --json
 idun-multi schema groq
+```
+
+See **[SUPPORT_MATRIX.md](./SUPPORT_MATRIX.md)** for the full per-provider
+capability table (streaming / tools / vision / JSON mode), generated from the
+transports actually implemented in the SDK. Render it live with:
+
+```bash
+idun-multi support
 ```
 
 ```json

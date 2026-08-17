@@ -4,6 +4,24 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.11] — 2026-08-17
+
+### Added
+- **Support matrix docs (P4 backlog item).** New `SUPPORT_MATRIX.md` documents
+  per-provider capabilities (streaming / tools / vision / JSON mode). It is
+  **generated from the transports actually implemented in `idun/providers.py`**
+  via the new `support_matrix()` / `support_matrix_text()` helpers, so the doc
+  can never drift from the code. A new `idun-multi support` command renders the
+  same table live. Summary of the honest matrix:
+  - **azure**: streaming ✓, tools ✓ (agent tool-trace), vision —, JSON mode ✓
+  - **openai transport** (groq/openrouter/together/deepseek/mistral/gemini/xai/
+    nous/ollama/local/perplexity/fireworks/novita): streaming ✓, JSON mode ✓,
+    tools —, vision —
+  - **anthropic / hf**: no streaming / tools / vision / JSON mode (single-chunk
+    fallback)
+- **Tests:** `tests/test_support_matrix.py` asserts the matrix is derived from
+  the registry and matches the `cmd_schema` JSON-mode rule.
+
 ## [1.0.10] — 2026-08-17
 
 ### Added

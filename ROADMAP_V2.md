@@ -179,4 +179,5 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
    in the wizard or one `Provider()` row.
 3. **OS keyring** backend for credentials — DONE in v1.0.10 (`idun.keyring_store`,
    opt-in via `IDUN_KEYRING=1` or config; strictly secondary to the file store).
-4. **Support matrix docs** — streaming / tools / vision / JSON mode per provider.
+4. **Support matrix docs** — DONE in v1.0.11 (`SUPPORT_MATRIX.md`, generated from
+   `idun.providers.support_matrix()`; live via `idun-multi support`).
