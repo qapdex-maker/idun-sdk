@@ -57,13 +57,15 @@ def test_show_welcome_forces_reset_after_cmatrix(monkeypatch):
     out, calls = _run_show(force_cmatrix=True, monkeypatch=monkeypatch)
     assert calls["cmatrix"] == 1, "cmatrix must run once"
     assert calls["reset"] >= 1, "hard reset must run (the fix)"
-    # banner + tree art present
+    # banner + tree scene present
     assert "NatureLM-Idun-5-MoE" in out
     assert "idun-sdk" in out
     # block-letter wordmark: the IDUN art uses these anchor glyphs
     assert "___    ___" in out and "|_ _|" in out
-    # the world-tree motif uses box-drawing slashes
-    assert "\\||/" in out or "\\____/" in out or "_\\/_" in out
+    # the new world-tree scene: centred ascii with IDUN in the trunk
+    assert "the world-tree" in out
+    assert "| IDUN|" in out
+    assert "\\__/" in out or "____|____" in out  # roots/base of the tree
 
 
 def test_show_welcome_renders_art_without_cmatrix(monkeypatch):

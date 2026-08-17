@@ -24,6 +24,23 @@ import sys
 
 __all__ = ["maybe_welcome", "show_welcome", "show_welcome_then_wizard"]
 
+# shortest-path term width (avoid importing retro just for this)
+def _term_width(default: int = 80) -> int:
+    try:
+        return max(40, min(shutil.get_terminal_size((default, 24)).columns, 120))
+    except OSError:
+        return default
+
+
+# colour keys used by the ascii scene, mapped to 256-colour / 16-colour codes
+_COLOR_CODE = {
+    "purple": "\033[38;5;141m",
+    "blue": "\033[38;5;57m",
+    "cyan": "\033[38;5;51m",
+    "green": "\033[38;5;48m",
+    "gold": "\033[38;5;221m",
+}
+
 # Flag file so the matrix/welcome only appears on the very first run after
 # a fresh `pip install`. Lives in the user's home, not the package dir.
 _FLAG = os.path.join(os.path.expanduser("~"), ".idun_sdk_firstrun")
@@ -44,19 +61,35 @@ _IDUN_ART = (
     r" |___|  \___/|_|\/_|_|\/_|_|\_\ |_|  \___/|_|\_\___| "
 )
 
-# A small "world tree / tree of knowledge" motif under the wordmark — the
-# Idun (Norse: "the one who sets in motion") myth, rendered in ANSI box art.
-_TREE_ART = (
-    "        " + _GREEN + r"    \||/    " + _RESET + "\n"
-    "        " + _GREEN + r"     --o--    " + _RESET + "\n"
-    "        " + _GREEN + r"   \  ||  /   " + _RESET + "\n"
-    "    " + _CYAN + r"_\/_   ||   _/_/" + _RESET + "\n"
-    "   " + _CYAN + r"/  \  ||  /  " + "\\" + _RESET + "\n"
-    "  " + _GOLD + r"(    )  ||  (    )" + _RESET + "\n"
-    "   " + _GOLD + r"\____/ || \____/" + _RESET + "\n"
-    "        " + _BLUE + r"    ||     " + _RESET + "\n"
-    "        " + _BLUE + r"  ============= " + _RESET
-)
+# A larger "world tree of knowledge" (Yggdrasil) scene. Each tuple is
+# (plain ascii line, colour key). Rendered centred so it never goes ragged
+# on narrow Termux windows. No line ends in a backslash (raw-string safety).
+_TREE_SCENE = [
+    (r"          .    *    .    *    .    ", "green"),
+    (r"        *     the world-tree     * ", "green"),
+    (r"            |    *    |    *    |   ", "green"),
+    (r"           /|\   |   /|\   |   /|\ ", "green"),
+    (r"          / | \  |  / | \  |  / | \ ", "green"),
+    (r"         /  |  \ | /  |  \ | /  |  \ ", "green"),
+    (r"        /   |   \|/   |   \|/   |   \ ", "green"),
+    (r"       /    |    |    |    |    |    \ ", "purple"),
+    (r"      /     |    |    |    |    |     \ ", "purple"),
+    (r"     (      | IDUN|    | IDUN|      ) ", "purple"),
+    (r"      \     |    |    |    |    |     / ", "purple"),
+    (r"       \    |    |    |    |    |    / ", "purple"),
+    (r"        \   |    |    |    |    |   / ", "purple"),
+    (r"         \  |    |    |    |    |  / ", "purple"),
+    (r"          \ |    |    |    |    | / ", "purple"),
+    (r"           \|    |    |    |    |/ ", "purple"),
+    (r"            |    |    |    |    |   ", "purple"),
+    (r"        ____|____|____|____|____   ", "gold"),
+    (r"       /    |    |    |    |    \  ", "gold"),
+    (r"      /     |    |    |    |     \ ", "gold"),
+    (r"     /  __  |    |    |    |  __  \ ", "gold"),
+    (r"    |  |  | |    |    |    |  |  | | ", "gold"),
+    (r"    |  |__| |    |    |    |  |__| | ", "gold"),
+    (r"     \  \__/     |    |     \__/  /  ", "gold"),
+]
 
 _SUBTITLE = (
     _BLUE + "NatureLM-Idun-5-MoE" + _RESET
@@ -142,13 +175,25 @@ def _print_welcome_art() -> None:
     for line in _IDUN_ART.splitlines():
         sys.stdout.write("  " + line + "\n")
     sys.stdout.write("\n")
-    for line in _TREE_ART.splitlines():
-        sys.stdout.write(line + "\n")
+    _print_tree_scene()
     sys.stdout.write("\n")
     sys.stdout.write("  " + _SUBTITLE + "\n")
     sys.stdout.write("  " + _TAGLINE + "\n")
     sys.stdout.write("\n")
     sys.stdout.flush()
+
+
+def _print_tree_scene() -> None:
+    """Render the world-tree scene, centred, in brand colours."""
+    # widest line drives centring so nothing goes ragged on narrow Termux
+    widest = max(len(line) for line, _ in _TREE_SCENE)
+    term_w = _term_width()
+    for line, color in _TREE_SCENE:
+        code = _COLOR_CODE.get(color, "")
+        pad = max(0, (term_w - len(line)) // 2)
+        # pad to centre; clip the leading pad to the scene width for balance
+        lead = max(0, min(pad, (term_w - widest) // 2 + (widest - len(line)) // 2))
+        sys.stdout.write(" " * lead + code + line + _RESET + "\n")
 
 
 def show_welcome(force_cmatrix: bool = False) -> None:
