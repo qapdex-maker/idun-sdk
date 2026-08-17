@@ -6,21 +6,41 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://pypi.org/project/idun-sdk/)
 [![stdlib-only](https://img.shields.io/badge/stdlib--only-%E2%9C%93-7c3aed.svg)](https://pypi.org/project/idun-sdk/)
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/qapdex-maker/idun-sdk/main/idun/data/foundry_logo_color.svg" width="104" height="110" alt="Azure AI Foundry logo"/>
-</p>
-
-**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 13-provider registry and a 16-bit retro console.**
+**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 13-provider registry, a 16-bit retro console, and an MCP server that exposes the whole registry.**
 
 Runs headless on Termux/Android with nothing but the Python standard library
 (no `httpx`, no `azure-identity`, no Flask). Idun is a **tool agent** (reasons +
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 (reasoning + tool calls) instead of a black-box answer.
 
-## Multi-provider (v0.2.0)
+## What's in the box (v1.0)
 
-Since v0.2.0 the SDK ships a **declarative provider registry** covering 13
-providers over 3 transports, plus `idun-multi`: a 16-bit retro console.
+- **13-provider registry** over 3 transports (OpenAI-compatible, Anthropic,
+  Hugging Face). Any OpenAI-compatible endpoint works with zero code changes.
+- **`idun-multi`** — a 16-colour ANSI "16-bit" console with provider switching,
+  credential wizard, model discovery, fallback chains, themes, and a REPL.
+- **Config file** `~/.idun/config.toml` as the primary config source
+  (env vars still win; registry defaults are the fallback).
+- **Structured output** — `--json` on any command and a `schema` command.
+- **Fallback chains** — fan a prompt across providers until one answers
+  (`IDUN_CHAIN`).
+- **Theme system** — `classic` / `c64` / `gameboy` / `amiga` / `cga`.
+- **Live model discovery** — `GET {base}/models`, cached 24h.
+- **MCP server parity** — `idun_providers`, `idun_ask`, `idun_race` alongside
+  the original `idun_chat` / `idun_trace` / `idun_export` / `idun_token` tools.
+- **Async client** — `AsyncIdunClient` for concurrent fan-out via asyncio.
+- **Verified install** — `test.sh` builds a fresh wheel, installs it into a
+  temp dir, runs the offline suite, and asserts the console scripts resolve
+  to this package.
+- **CI** — Python 3.8–3.14 matrix + a native Termux/aarch64 job + ruff lint.
+
+## Quick start
+
+```bash
+pip install idun-sdk          # or: ./install.sh  (editable, no-deps)
+./test.sh                     # post-install verification (offline, isolated)
+idun-multi doctor             # env + credential + console-script audit
+```
 
 ```bash
 idun-multi providers                    # all 13 providers + credential state
@@ -28,6 +48,8 @@ idun-multi login --provider groq        # hidden prompt -> ~/.idun/groq.token (0
 idun-multi ask "explain MoE routing"    # active provider
 idun-multi -p openrouter ask "hi"       # one-off provider
 idun-multi race "Name one planet."      # fan one prompt at every ready provider
+idun-multi models --discover            # live model list for the active provider
+idun-multi theme c64                     # switch retro palette
 idun-multi doctor                       # env + credential + console-script audit
 ```
 
@@ -75,7 +97,7 @@ Persist them in `~/.idunrc` (mode 0600, outside the repo) and
 Python API:
 
 ```python
-from idun import complete, list_providers
+from idun.providers import complete, list_providers
 
 c = complete("groq", "Summarise MoE routing in one line.")
 print(c.text, c.model, c.latency_ms, c.total_tokens)
@@ -85,147 +107,91 @@ Credentials resolve from the provider env keys first, then
 `~/.idun/<id>.token` (file 0600, dir 0700). Keys are never echoed and never
 passed via argv.
 
-### Retro UI
+## Configuration file
 
-The 16-colour ANSI chrome degrades cleanly: `NO_COLOR=1` or `IDUN_NO_RETRO=1`
-disables colour, `IDUN_ASCII=1` swaps box-drawing for pure ASCII,
-`IDUN_FORCE_COLOR=1` keeps colour through a pipe, `IDUN_NO_TYPEWRITER=1`
-prints answers instantly.
+`~/.idun/config.toml` is the primary config source. Resolution order is
+**env var > `~/.idun/config.toml` > registry default**, so whatever you put in
+the file is always overridable from the shell without editing it.
 
-## Multi-backend (legacy, pre-0.2)
+```toml
+[defaults]
+provider = "groq"
+theme    = "c64"
 
-The same `IdunClient` API dispatches to three interchangeable backends. Non-Azure
-backends need no `FOUNDRY_TOKEN`, so the SDK keeps working even when the Azure
-subscription is suspended.
+[providers.groq]
+model = "llama-3.3-70b-versatile"
+base  = "https://api.groq.com/openai/v1"
 
-| Backend  | Credentials                          | Cost     | Notes |
-|----------|--------------------------------------|----------|-------|
-| `azure`  | Entra device-code (`idun login`)     | paid     | default; full tool-agent trajectory |
-| `hf`     | `HF_TOKEN` / `~/hf_token.txt`        | free     | Hugging Face Inference API; flat answer |
-| `github` | `GITHUB_TOKEN` / `~/github_token.txt` | free tier | GitHub Models (OpenAI-compatible); **needs Copilot/VS Code routing — plain PAT returns 404** |
-| `openai` | `OPENAI_API_KEY` / `~/openai_token.txt` | paid/free tier | OpenAI-compatible `/v1/chat/completions`; any OpenAI-compatible endpoint via `OPENAI_BASE` |
-
-Set the backend globally via env (`IDUN_BACKEND=hf`) or per-call (`--backend`).
-Model overrides: `HF_MODEL`, `GITHUB_MODEL`, `OPENAI_MODEL`, `OPENAI_BASE`.
-Non-Azure backends return a flat answer (`res.steps == []`) — the tool-agent
-trajectory is an Azure-Idun feature.
-
-## Install
-
-```bash
-pip install idun-sdk
+[providers.openai]
+model = "gpt-4o-mini"
 ```
 
-Installs the `idun` CLI, the `idun` Python package, and the stdlib MCP server
-`idun_mcp.py`. Requires Python ≥ 3.8; **no third-party dependencies**
-(stdlib-only, runs headless on Termux/Android).
+The file is parsed by a stdlib-only TOML reader (no `tomllib` requirement, so
+it works on Python 3.8+). A corrupt or malformed file never crashes startup —
+you get a clear warning and the registry defaults are used instead.
 
-Verify the install:
+## Structured output
 
-```bash
-idun --help          # shows all commands
-idun welcome         # banner + matrix intro
-```
-
-## Setup
-
-Idun is backend-agnostic. Pick a backend once with the wizard (writes
-`~/.idunrc`, sourced automatically by your shell), or set credentials per
-backend. Run the wizard for a guided, universal first-run setup:
+Every command that produces a completion supports `--json`, which emits a
+single completion-shaped JSON object at the end (streaming still prints
+chunks live in non-JSON mode). Use the `schema` command to inspect the
+response schema per provider, including whether `json_mode` is supported:
 
 ```bash
-idun wizard          # choose backend, capture creds/config -> ~/.idunrc
-source ~/.idunrc     # or restart your shell
-idun status          # confirm active backend + credential state
+idun-multi ask "What is a MoE?" --json
+idun-multi schema groq
 ```
 
-### Backend credentials
+```json
+{"provider": "groq", "model": "llama-3.3-70b-versatile",
+ "text": "...", "prompt_tokens": 7, "completion_tokens": 23,
+ "total_tokens": 30, "latency_ms": 412, "raw": {...}}
+```
 
-| Backend  | Setup command                              | Stored at / env            |
-|----------|--------------------------------------------|----------------------------|
-| `azure`  | `idun login`                               | `~/foundry_token.txt`      |
-| `hf`     | `idun login --backend hf`                  | `~/hf_token.txt` / `HF_TOKEN` |
-| `github` | `idun login --backend github`              | `~/github_token.txt` / `GITHUB_TOKEN` |
-| `openai` | `idun login --backend openai`             | `~/openai_token.txt` / `OPENAI_API_KEY` |
+## Fallback chains
 
-**Azure (default).** `idun login` runs a device-code flow and stores an Entra
-bearer token. **No admin role required** — any tenant user with agent RBAC can
-run it; admin rights are only needed to *configure* the agent, not to *use* it.
-The token auto-rotates before expiry.
-
-**Hugging Face / GitHub.** The wizard or `idun login --backend <x>` prompts for
-a token and saves it (0600). Both offer a free tier; no Azure subscription or
-card needed.
-
-### Switching backends
-
-Globally via env, or per call via `--backend`:
+`IDUN_CHAIN` lists providers to try in order; the first one that returns a
+non-retryable answer wins, and the chosen link is recorded in `raw._served_by`:
 
 ```bash
-export IDUN_BACKEND=hf          # all future calls use HF
-idun chat --backend github "Hi" # one-off override
+export IDUN_CHAIN=groq,openrouter,openai
+idun-multi ask "Ansible vs Terraform, one line."   # tries groq, then openrouter, then openai
 ```
 
-Model overrides (optional): `HF_MODEL`, `GITHUB_MODEL`.
-
-### Quick test
-
-```bash
-idun chat "Hello"                       # azure (needs login first)
-idun chat --backend hf "Hello"          # any backend with creds set
-```
-
-## Quickstart
-
-```bash
-idun chat "Summarize Contoso's sustainability comms in one sentence."
-idun trace --backend azure "Use web_search to find the current CEO of Contoso."
-```
+Skipped links on 429 / 5xx / auth / transport errors are reported in
+`raw._chain`. Programmatic:
 
 ```python
-from idun import IdunClient
-
-# Azure (default)
-res = IdunClient().complete("Your prompt here")
-print(res.text)                 # final answer
-for s in res.steps:             # agent trajectory
-    print(s.kind, s.tool, s.query, s.status)
-
-# Hugging Face (no Azure token needed)
-res = IdunClient(backend="hf", hf_token="hf_xxx",
-                 hf_model="microsoft/phi-3-mini-4k-instruct").complete("Hello")
-print(res.text)
+from idun.providers import complete_chain
+c = complete_chain(["groq", "openrouter"], "hi")
+print(c.raw["_served_by"])
 ```
 
-## Commands
+## Themes
 
-| Command | Purpose |
-|---------|---------|
-| `idun wizard` | universal first-run setup |
-| `idun login [--backend X]` | store backend credentials |
-| `idun status` | show active backend + credential state |
-| `idun chat` | final answer only |
-| `idun trace` | full trajectory (steps + text) |
-| `idun export` | trajectory as JSON / Markdown |
-| `idun packs` / `idun run` | curated prompt packs (e.g. Contoso) |
-| `idun diff` | side-by-side trace diff of two prompts |
-| `idun token` | inspect / refresh the Foundry token |
-| `idun logo` | print the Foundry logo |
-
-## Hugging Face pipeline
-
-The `hf` command wraps the Hugging Face Hub + Inference API (stdlib-only for
-`whoami` / `status`; `push` uses the optional `huggingface_hub` client):
+The 16-colour chrome is selectable via `IDUN_THEME` (read at import) or the
+`theme` command. Palettes: `classic` (default), `c64`, `gameboy`, `amiga`,
+`cga`. Unknown ids fall back to `classic`.
 
 ```bash
-idun hf whoami                              # validate token, show HF user
-idun hf status microsoft/phi-3-mini-4k-instruct   # exists? gated? private? task?
-idun hf push Qapdex/my-agent-out a.txt b.txt       # create repo + upload files
+idun-multi theme gameboy
 ```
 
-`push` needs `pip install huggingface_hub` (kept optional so the SDK stays
-stdlib-only for everything else). Upload under your **user** namespace
-(`Qapdex/...`), not an org, unless your token has write rights there.
+`NO_COLOR=1` / `IDUN_NO_RETRO=1` disable colour entirely, `IDUN_ASCII=1`
+swaps box-drawing for pure ASCII, `IDUN_FORCE_COLOR=1` keeps colour through a
+pipe, and `IDUN_NO_TYPEWRITER=1` prints answers instantly.
+
+## Model discovery
+
+`models` shows the registry model list; `--discover` fetches the live
+`GET {base}/models` endpoint and caches it under `~/.idun/models/<id>.json`
+for 24h (override with `IDUN_MODELS_CACHE_MAX_AGE`, disable with
+`IDUN_NO_MODELS_CACHE`). On any error or for non-OpenAI transports, the
+registry list is returned so callers always get something usable.
+
+```bash
+idun-multi models groq --discover
+```
 
 ## MCP server
 
@@ -235,26 +201,62 @@ stdlib-only for everything else). Upload under your **user** namespace
 python3 idun_mcp.py
 ```
 
-Exposes `idun_chat(prompt)` and `idun_trace(prompt)`. Add to any MCP client:
+Tools exposed:
+
+| Tool | Purpose |
+|---|---|
+| `idun_chat` | final answer from the Idun agent |
+| `idun_trace` | full trajectory (steps + text) |
+| `idun_export` | trajectory as JSON / Markdown |
+| `idun_token` | inspect stored token state (no secret leak) |
+| `idun_providers` | list the registry + credential state |
+| `idun_ask` | send one prompt to ANY provider in the registry |
+| `idun_race` | fan one prompt at several providers (latency + state) |
+
+Add to any MCP client:
 
 ```json
 { "mcpServers": { "idun": { "command": "python3", "args": ["/abs/path/idun-sdk/idun_mcp.py"] } } }
 ```
 
-Docs mirror (GitMCP): `https://gitmcp.io/qapdex-maker/idun-sdk/sse`
+## Async client
 
-## Combine with Sentry (MCP)
+```python
+import asyncio
+from idun.async_client import AsyncIdunClient
 
-Idun pairs well with [Sentry's MCP server](https://github.com/getsentry/sentry-mcp)
-so an agent can both *call* Idun and *inspect* Sentry errors. Add it remotely
-(OAuth, note the `/mcp` suffix):
+async def main():
+    c = AsyncIdunClient()
+    results = await c.gather(
+        c.acomplete("groq", "hi"),
+        c.acomplete("openai", "hi"),
+    )
+    for r in results:
+        print(r.text)
 
-```json
-{ "mcpServers": { "sentry": { "url": "https://mcp.sentry.dev/mcp" } } }
+asyncio.run(main())
 ```
 
-Recommended combo: `idun` (calls the agent) + `idun-docs` (reads SDK docs) +
-`sentry` (queries error tracking).
+`AsyncIdunClient` runs each (blocking) stdlib HTTP call in a worker thread via
+`asyncio.to_thread` — no dedicated thread pool — so the event loop stays free
+for concurrent fan-out.
+
+## Security
+
+- **Secrets are never on the command line.** `idun-multi login` reads keys with
+  `getpass` (hidden input); they are written to `~/.idun/<id>.token` (mode 0600,
+  inside a 0700 dir), never echoed, never logged.
+- **Error bodies are sanitised.** Upstream error responses are truncated and
+  scrubbed before they reach stderr/logs, so a token accidentally echoed by a
+  provider is never relayed back.
+- **SSRF guard.** Every outbound request is validated to be `http://`/`https://`
+  via `_require_http_url` before any connection is made — `file://`, `gopher://`,
+  and similar schemes are rejected, so a malicious `IDUN_*_BASE` cannot read
+  local files.
+- **No bundled tenant/resource.** The Azure provider is configured purely from
+  your environment; the package ships no credentials and no default resource.
+- **Token inspection is secret-free.** `idun token` / the `idun_token` MCP tool
+  report validity, expiry, and the account UPN — never the bearer token itself.
 
 ## Azure request shape (verified)
 
@@ -266,6 +268,18 @@ Authorization: Bearer ***
 
 - `model` MUST be `"model-router"` (agent id is in the URL).
 - Do **not** send a `tools` key — the agent owns its tools (else `400 invalid_payload`).
+
+## Install & verify
+
+```bash
+pip install idun-sdk          # or: ./install.sh
+./test.sh                     # builds a wheel, installs into a temp dir,
+                              # runs the offline suite, asserts console
+                              # scripts resolve to THIS package
+```
+
+Requires Python ≥ 3.8; **no third-party dependencies** (stdlib-only, runs
+headless on Termux/Android).
 
 ## Links
 

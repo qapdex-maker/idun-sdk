@@ -29,7 +29,7 @@ import asyncio
 
 from . import providers as _P
 from .providers import (
-    Completion, complete, complete_chain, default_provider, get_provider,
+    Completion, default_provider, get_provider,
 )
 
 
