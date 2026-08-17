@@ -836,8 +836,50 @@ def default_provider() -> str:
             or "azure").strip().lower()
 
 
+def complete_chain(chain: list[str], prompt: str, *, model: str = "",
+                   system: str = "", temperature: float = 0.7,
+                   max_tokens: int = 1024, timeout: int = 120,
+                   history: list[dict] | None = None,
+                   no_cache: bool = False, retries: int = 1) -> Completion:
+    """Try providers in order, falling back on failure.
+
+    Unlike a single ``complete()`` call, this walks ``chain`` (a list of
+    provider ids). A provider that raises a retryable error (HTTP 429/5xx),
+    an auth error (no credential / 401), or any transport failure is skipped
+    and the next link is tried. The first provider to return a Completion
+    wins; its ``raw`` is annotated with ``_chain`` (the full tried order) and
+    ``_served_by`` (which link answered) so callers can report it.
+
+    Raises RuntimeError only if every link failed (the message lists each
+    failure). ``retries`` per link is kept low (default 1) because the chain
+    itself is the resilience mechanism.
+    """
+    errors: list[str] = []
+    for pid in chain:
+        try:
+            comp = complete(
+                pid, prompt, model=model, system=system,
+                temperature=temperature, max_tokens=max_tokens,
+                timeout=timeout, history=history, no_cache=no_cache,
+                retries=retries,
+            )
+            raw = dict(comp.raw) if isinstance(comp.raw, dict) else {}
+            raw["_chain"] = list(chain)
+            raw["_served_by"] = pid
+            return Completion(
+                text=comp.text, model=comp.model, provider=comp.provider,
+                prompt_tokens=comp.prompt_tokens,
+                completion_tokens=comp.completion_tokens,
+                latency_ms=comp.latency_ms, raw=raw,
+            )
+        except (RuntimeError, ValueError) as e:
+            errors.append(f"{pid}: {e}")
+            continue
+    raise RuntimeError("all chain links failed: " + " | ".join(errors))
+
+
 __all__ = [
     "Provider", "Completion", "REGISTRY", "list_providers", "get_provider",
     "resolve_credential", "save_credential", "credential_status", "complete",
-    "default_provider", "CONFIG_DIR", "replace",
+    "complete_chain", "default_provider", "CONFIG_DIR", "replace",
 ]
