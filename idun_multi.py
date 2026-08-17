@@ -84,7 +84,14 @@ def cmd_models(args) -> int:
     if p.notes:
         lines.append(f"notes  : {p.notes}")
     lines.append("")
-    for m in (p.models or (p.default_model,)):
+    if getattr(args, "discover", False):
+        live = P.discover_models(p.id, force=True)
+        lines.append(R.status("info", f"live models from GET {p.resolved_base().rstrip('/')}/models"))
+    else:
+        live = P.discover_models(p.id)
+        if P._models_cache_get(p.id) is not None:
+            lines.append(R.status("info", "showing cached discovery (use --discover to refresh)"))
+    for m in live:
         mark = "*" if m == p.resolved_model() else " "
         lines.append(f" {mark} {m}")
     print(R.box(lines, title=f"{p.id.upper()} — {p.label}"))
@@ -604,6 +611,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.set_defaults(func=cmd_providers)
 
     sp = sub.add_parser("models", help="show models for a provider")
+    sp.add_argument("--discover", action="store_true",
+                    help="fetch live model list from GET {base}/models (cached 24h)")
     sp.set_defaults(func=cmd_models)
 
     sp = sub.add_parser("login", help="store an API key for a provider")

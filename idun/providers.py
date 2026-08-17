@@ -878,8 +878,96 @@ def complete_chain(chain: list[str], prompt: str, *, model: str = "",
     raise RuntimeError("all chain links failed: " + " | ".join(errors))
 
 
+# -------------------------------------------------------------------------
+# Model discovery (v0.5) — live GET /v1/models, cached on disk.
+# -------------------------------------------------------------------------
+
+MODELS_CACHE_DIR = os.path.join(CONFIG_DIR, "models")
+MODELS_CACHE_MAX_AGE_S = int(os.environ.get("IDUN_MODELS_CACHE_MAX_AGE",
+                                             "86400"))  # 24h
+
+
+def _models_cache_path(pid: str) -> str:
+    return os.path.join(MODELS_CACHE_DIR, f"{pid}.json")
+
+
+def _models_cache_get(pid: str):
+    if os.environ.get("IDUN_NO_MODELS_CACHE"):
+        return None
+    try:
+        with open(_models_cache_path(pid), encoding="utf-8") as fh:
+            rec = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if time.time() - rec.get("ts", 0) > MODELS_CACHE_MAX_AGE_S:
+        return None
+    return rec.get("models")
+
+
+def _models_cache_put(pid: str, models: list[str]) -> None:
+    if os.environ.get("IDUN_NO_MODELS_CACHE"):
+        return
+    try:
+        os.makedirs(MODELS_CACHE_DIR, exist_ok=True)
+        with open(_models_cache_path(pid), "w", encoding="utf-8") as fh:
+            json.dump({"ts": time.time(), "models": models}, fh)
+    except OSError:
+        pass
+
+
+def discover_models(pid: str, *, timeout: int = 30, force: bool = False) -> list[str]:
+    """Return live model ids for a provider via ``GET {base}/models``.
+
+    Results are cached under ``~/.idun/models/<pid>.json`` for 24h (override
+    with ``IDUN_MODELS_CACHE_MAX_AGE`` or disable with
+    ``IDUN_NO_MODELS_CACHE``). On any failure (no network, non-OpenAI
+    transport, auth error) the registry's hardcoded ``models`` tuple is
+    returned so callers always get something usable.
+    """
+    p = get_provider(pid)
+    if not force:
+        cached = _models_cache_get(pid)
+        if cached is not None:
+            return cached
+    if p.transport not in ("openai", "azure"):
+        # HF/anthropic have no uniform /models endpoint we can rely on
+        return list(p.models)
+    token = resolve_credential(p)
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    url = f"{p.resolved_base().rstrip('/')}/models"
+    try:
+        data = _get_json(url, headers, timeout)
+    except (RuntimeError, ValueError):
+        return list(p.models)
+    ids: list[str] = []
+    items = data.get("data") if isinstance(data, dict) else None
+    if isinstance(items, list):
+        for it in items:
+            if isinstance(it, dict) and it.get("id"):
+                ids.append(str(it["id"]))
+    if not ids:
+        return list(p.models)
+    _models_cache_put(pid, ids)
+    return ids
+
+
+def _get_json(url: str, headers: dict, timeout: int) -> dict:
+    _require_http_url(url)
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        detail = _sanitize_error_body(
+            e.read().decode("utf-8", "replace")[:400])
+        raise RuntimeError(f"HTTP {e.code} from {url}: {detail}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"cannot reach {url}: {e.reason}") from e
+
+
 __all__ = [
     "Provider", "Completion", "REGISTRY", "list_providers", "get_provider",
     "resolve_credential", "save_credential", "credential_status", "complete",
-    "complete_chain", "default_provider", "CONFIG_DIR", "replace",
+    "complete_chain", "discover_models", "default_provider", "CONFIG_DIR",
+    "replace",
 ]
