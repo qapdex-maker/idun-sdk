@@ -1,234 +1,195 @@
-# Idun Roadmap
+# Idun SDK — Roadmap (v0.2.0 → v1.0.14)
 
-> **DEPRECATED — this file is historical (v0.1.x era).** The current,
-> maintained planning record is **[ROADMAP_V2.md](./ROADMAP_V2.md)** (v0.2.0 →
-> v1.0.14, §8 fully shipped). Release-by-release detail is in
-> [CHANGELOG.md](./CHANGELOG.md). Kept for archive/history only.
+Status of this document: **FINAL.** All planned items (v0.2.0 → v1.0.x) are
+implemented and verified; the SDK is feature-complete at **v1.0.14**. Release
+notes live in [CHANGELOG.md](./CHANGELOG.md). §8 (post-v1.0 backlog) is fully
+shipped (v1.0.6 → v1.0.14).
 
-Status quo, nahe, mittelfristige und Vision-Ziele (Stand v0.1.x, archiviert):
+---
 
-## Status quo (erledigt, live auf GitHub / PyPI)
+## 1. Audit findings (what was actually broken)
 
-- **idun-sdk** `v0.1.18` auf PyPI (`pip install idun-sdk`): Code gemergt,
-  Tag `v0.1.18` pushed, **PyPI-Upload erledigt** (live:
-  https://pypi.org/project/idun-sdk/0.1.18/). Stdlib-only,
-  `install_requires=[]`. Client + CLI (`idun login|chat|trace|export|
-  packs|run|diff|token|logo`), Entra Device-Code-Auth, Token-Auto-Rotation,
-  Async (`--async`, jetzt `get_running_loop()` statt deprecated
-  `get_event_loop()`), Trace-Export, Contoso-Prompt-Packs (8 Demos), Side-by-Side-Diff.
-- **idun-playground**: Dark-Mode (ai.azure.com-Look), Agent-Trace-Panel,
-  `diff.html` (Side-by-Side-Spalten), `router.py` (stdlib HTTP-Server mit
-  `/api/chat`, `/api/chat/stream` SSE, `/api/diff`, **BrokenPipeError-guarded
-  SSE-Loop**). **Router E2E verifiziert** (alle 3 Endpunkte 200 mit echtem
-  FOUNDRY_TOKEN, live im Recording bestätigt).
-- **CodeRabbit**: PR #1 (idun-sdk, async-Fix) + PR #3 (playground, SSE-guard)
-  gemergt — beide 🎉 ohne actionable Findings reviewt. `.coderabbit.yaml`
-  path_filters-Bug behoben (alle diff-scoped Files werden jetzt erfasst).
-- **Docs**: README/long_description ("no admin needed", neutral naming),
-  Sentry-MCP-Sektion (remote `https://mcp.sentry.dev/mcp` + `mcp-remote`
-  OAuth-Flow), `.mcp.example.json` (idun + idun-docs + sentry Combo).
-- **CI**: `pytest`-Suite (wird über `run_tests.sh` ausgeführt, cwd-gepinnt +
-  Fremd-Trees via `norecursedirs`/`--ignore` ausgeschlossen — verhindert den
-  vorigen 10-Min-Crash durch Chromium/Qt-Tests unter `~/storage`). 8 Tests
-  grün.
-- **CodeRabbit-Key verifiziert**: `cr-ce37...` ist gültig (Server akzeptiert
-  ihn, `403` statt `401` am Enterprise-only Metrics-Endpoint). Pro+-Plan →
-  GitHub-App PR-Review-Flow nutzbar; REST-API sonst Enterprise-gated.
+(Unchanged from the v0.2.0 audit — see git history. F1–F6 were all resolved
+by v0.2.7; the registry, retro UI, CLI, and test suite established there are
+what the v0.4–v1.0 features build on.)
 
-## Phase 2 — Nächste Schritte (ALLE ERLEDIGT)
+---
 
-1. **MCP-Server-Wrapper (2.1)** — `idun_mcp.py` exponiert
-   `IdunClient.complete()` als stdlib-MCP-Tool. ✓
-2. **Async (2.2)** — `complete_async` via `asyncio.run_in_executor`,
-   CLI `--async`. ✓
-3. **Test-Suite + CI (2.3)** — `pytest` (14 passed), GitHub Actions offline. ✓
-4. **PyPI-Publish (2.4)** — `v0.1.17` live, stdlib-only. ✓
-5. **Token-Auto-Rotation (2.5)** — `idun login` speichert Refresh-Context,
-   CLI erneuert `FOUNDRY_TOKEN` vor Ablauf. ✓
-6. **Contoso-Prompt-Packs (2.6)** — `idun data/prompt_packs/contoso_pack.json`,
-   `idun packs` / `idun run contoso <key>`. ✓
+## 2. Done in v0.2.0 (implemented + verified)
 
-## Phase 3 — Mittelfristig
+(See git history / previous roadmap revision. Provider registry, 16-bit retro
+UI, `idun-multi` CLI, and 74 offline tests were shipped and verified live.)
 
-1. **PR #4249** bei Microsoft Learn (NatureLM-Idun-5-MoE Connector,
-   independent publisher) — **EXTERN BLOCKIERT**, wartet auf Review.
-2. **365-Kalendereintrag** — **EXTERN BLOCKIERT** (Exchange-Lizenz fehlt,
-   Graph Device-Code bereit, 401 = keine Mailbox).
-3. **Trace-Export (3.3)** — `idun export --format json|md`,
-   `IdunResult.to_json()/to_markdown()`. ✓ (offline getestet)
-4. **Side-by-Side-Trace (3.4)** — `idun diff`, `diff_traces()/format_diff()`,
-   `diff.html` Spalten-UI. ✓ (UI + Router-Route + **Live-Test verifiziert**,
-   Router E2E localhost 200).
+---
 
-## Phase 4 — Vision
+## 2b. Shipped since v0.2.0 (v0.2.1 → v0.2.7)
 
-1. **Idun als Backend in Hermes WebUI (4.1)** — **NICHT GEPLANT (bewusst verzichtet):**
-   Entscheidung: Idun braucht keine WebUI-Integration. Die saubere, wartbare
-   Anbindung ist (1) Idun als **MCP-Server** (`idun` + `idun-docs`) → Hermes
-   core ruft es via Tool, und (2) der **eigenständige Playground**
-   (`idun-playground`, dark Foundry-Look, Chat/Diff/SSE). Ein zweiter UI-Ort
-   im fremden `hermes-webui`-Repo (AGENTS.md: 1 PR = 1 Änderung, eigene
-   `.venv`-Policy, Upstream-Review) wäre Doppelpflege + Merge-Risiko bei
-   Upstream-Updates, ohne echten Mehrwert.
-   **PoC (lokaler Fork `~/repo/own/hermes-webui`, Branch `feat/idun-phase4-1`):**
-   Tab + Chat live verifiziert — dient nur als Referenz, wird NICHT verfolgt
-   und NICHT nach GitHub gepusht. HTTPS-Verbindung/Upstream-Commits: keiner.
-2. **Wiederverwendbare Tool-Agent-Visualisierung (4.2)** — **ERLEDIGT:**
-   `trace-viz.js` + `trace-viz.css` (stdlib ES, keine Deps) rendern eine
-   Agent-Trajectory (reasoning + tool steps) in beliebige Container und nutzen
-   die CSS-Variablen der Host-Seite (Foundry dark/light). `TraceViz.render()`
-   (single trace) + `TraceViz.renderDiff()` (Side-by-Side mit Shared/Unique-
-   Markern). `playground.html` und `diff.html` nutzen jetzt BEIDE diese eine
-   Komponente (duplizierter Inline-Code entfernt). `trace-viz-demo.html`
-   zeigt die Einbindung für **andere Foundry-Agents**. Node-Syntax- + Logik-
-   Test grün. Committet (`74dadf6`, IN SYNC).
-3. **Streaming (SSE) (4.3)** — `router.py /api/chat/stream` (NDJSON) +
-   `playground.html` `streamPrompt()`. ✓ (UI + Router gebaut; **Live-Test
-   verifiziert**, Router E2E localhost 200).
+(See git history / previous roadmap revision. v0.2.1 tenant removal, v0.2.2
+security remediation, v0.2.3 backend resolution, v0.2.4 unified retro UI,
+v0.2.5 Nous + resume, v0.2.6 streaming + REPL, v0.2.7 retire backends.py.)
 
-## Phase 5 — Quality Gate (ERLEDIGT)
+---
 
-1. **`coderabbit.yaml`** in `idun-sdk` + `idun-playground`:
-   - Severity-Threshold `critical` (Block-on-Critical, NVIDIA-Policy).
-   - `ignore` für stdlib-Only-False-Positives ("use requests/httpx").
-   - Reviews nur auf geänderte Dateien (diff-scoped).
-2. **PR-scoped Reviews (Flow 1)**: PR #1 (router.py) → CodeRabbit
-   diff-scoped Review, Findings F1/F2 behoben, **gemergt**.
-3. **MCP-Context**: alle MCPs auf CodeRabbit verifiziert — für Reviews
-   einbinden (User-guidance: Idun = stdlib Foundry-Tool-Agent).
-4. **Sentry MCP (Option A)**: als Provider in README + `.mcp.example.json`
-   dokumentiert (remote `mcp.sentry.dev/mcp` + `mcp-remote` OAuth). SDK
-   bleibt stdlib-only (kein `sentry_sdk`-Import).
+## 3. v0.3 — DONE
 
-## Nächste unblockierte Schritte (Priorität)
+1. **Streaming** (`--stream`) — DONE in v0.2.6.
+2. **Interactive REPL** (`idun-multi shell`) — DONE in v0.2.6.
+3. **Retire `backends.py`** — DONE in v0.2.7.
+4. **Console-script collision guard** — DONE in v0.2.0 (doctor check).
+5. **Cost accounting** — *deferred*: not in scope for v1.0. The `race` command
+   reports latency + token counts; a price table would be a registry-only
+   addition later. (No provider-agnostic public price API; left for a follow-up.)
+6. **Provider expansion** — Nous Research added in v0.2.5. v1.0 ships 14
+   providers (incl. Nous); new OpenAI-compatible endpoints are one `Provider(...)` row.
 
-- **A / A'** — Phase 4.1 WebUI: **NICHT GEPLANT.** Bewusst verzichtet —
-  Integration läuft via MCP (`idun`/`idun-docs`) + eigenständigem Playground.
-  Kein WebUI-Code auf GitHub, PoC nur lokal als Referenz.
-- **B** — Phase 4.2: Tool-Agent-Visualisierung als wiederverwendbare
-  Komponente (`trace-viz.js`/`.css`, in playground + diff genutzt). ✓ ERLEDIGT.
-- **C** — Extern: PR #4249 / 365-Kalender (blockiert, nur Nachfassen).
-- **D** — Optional: Diff-Endpoint Performance (parallel Calls / SSE-Streaming
-  für Diff) wenn Foundry-Latenz ein Problem wird.
+---
 
-## Phase 6 — Idun als lebendiger Tool-Agent (ERLEDIGT, v0.1.21)
+## 4. v0.4 — DONE
 
-Idun ist jetzt als MCP-Server im Hermes-Ökosystem registriert, nicht nur als
-CLI/Playground. Damit schließt sich die Agent-zu-Agent-Schleife.
+6. **Fallback chains** — DONE. `complete_chain(chain, prompt)` walks
+   `IDUN_CHAIN` (or an explicit list), skipping retryable/auth/transport
+   failures, recording the winning link in `raw["_served_by"]` and the skipped
+   links in `raw["_chain"]`. Tests: `tests/test_chain.py`.
+7. **Response caching** — DONE in v0.2.7 (`~/.idun/cache`, `IDUN_NO_CACHE=1`).
+8. **Retry with backoff** — DONE in v0.2.7 (honors `Retry-After`, jitter, cap).
+9. **Config file** — DONE. `idun/config.py` (stdlib-only TOML reader) makes
+   `~/.idun/config.toml` the primary source. Resolution: **env > config.toml >
+   registry default**. A corrupt file never crashes startup. Tests:
+   `tests/test_config.py`.
+10. **Structured output** — DONE. Every completion command supports `--json`
+    (single completion-shaped object at the end; streaming still prints live),
+    and `schema` shows the per-provider response schema incl. `json_mode`
+    support. `Completion.to_dict()` / `from_dict()` added. Tests:
+    `tests/test_structured_output.py`.
 
-1. **`idun-mcp` als `console_scripts`-Entry-Point** (`idun_mcp:main`) — kein
-   hart-codierter Pfad mehr nötig; `hermes mcp add idun --command idun-mcp`.
-2. **MCP-Tool-Surface erweitert** (6 Tools, stdlib JSON-RPC): `idun_chat`,
-   `idun_trace`, `idun_export` (json|md), `idun_diff` (json|md),
-   `idun_packs`, `idun_run`. Deckt jetzt die Auditing-Features des SDK ab.
-3. **Headless-sicher**: `main()` liest das Token nur noch nicht-blockierend aus
-   der Datei (kein `maybe_refresh()` → kein interaktiver Device-Code-Login im
-   Hintergrund). Abgelaufenes/fehlendes Token → sauberer "no token"-Fehler.
-4. **Bei Hermes registriert**: `hermes mcp add idun` → 6/6 Tools enabled
-   (`~/.hermes/profiles/microsoft/config.yaml`). Tools sind nach NEUER Session
-   verfügbar.
-5. **PyPI** `v0.1.21` live (Wheel + Sdist), commit `bfc45e1`.
+---
 
-## Evolve-Schritte A–D (2026-08-02, v0.1.22 + v0.1.23)
+## 5. v0.5 — DONE
 
-SDK + MCP weiter ausgebaut und **live verifiziert** (pytest 18/18 grün, PyPI
-0.1.22/0.1.23 live, MCP-Tools via stdio-Wire getestet):
+11. **MCP server parity** — DONE. `idun_mcp.py` now exposes `idun_providers`
+    (registry + credential state), `idun_ask` (any provider via
+    `providers.complete`), and `idun_race` (fan + latency/state) alongside the
+    original `idun_chat` / `idun_trace` / `idun_export` / `idun_token` tools.
+    Verified against the JSON-RPC wire contract offline. Tests:
+    `tests/test_mcp_parity.py`.
+12. **Async client** — DONE. `idun/async_client.py` `AsyncIdunClient` with
+    `acomplete()` / `acomplete_chain()` running the stdlib urllib transport via
+    `asyncio.to_thread` (no dedicated pool) + a `gather()` helper for fan-out.
+    Tests: `tests/test_async_client.py`.
+13. **Model discovery** — DONE. `discover_models(pid)` fetches
+    `GET {base}/models` for openai/azure transports, caches under
+    `~/.idun/models/<id>.json` (24h; `IDUN_NO_MODELS_CACHE` /
+    `IDUN_MODELS_CACHE_MAX_AGE`), falls back to registry models on error or
+    non-OpenAI transport. `_require_http_url` rejects `file://` etc. `idun-multi
+    models --discover` forces a refresh. Tests: `tests/test_model_discovery.py`.
+14. **Theme system** — DONE. Selectable palettes `classic` / `c64` / `gameboy`
+    / `amiga` / `cga` via `IDUN_THEME` (applied at import) or the `theme`
+    command; `doctor` reports the active theme. Unknown ids fall back to
+    `classic`. Tests: `tests/test_theme.py`.
 
-- **A — SDK Resilience:** `IdunClient.complete()/complete_async()` retryen jetzt
-  transiente 5xx/429 mit exponential backoff (2**attempt s, max 3 Versuche).
-  Beobachtet live: Foundry wirft intermittente HTTP 500 → vorher harter Abbruch,
-  jetzt automatischer Retry. 401 (Token) bleibt separater Pfad (maybe_refresh).
-  Tests: `test_retry_backoff_on_transient_500`, `test_retry_gives_up_after_max_attempts`,
-  `test_non_retryable_400_propagates_immediately`.
-- **B — Multi-turn Conversation:** neue `Conversation`-Klasse (threaded history als
-  strukturierter Text-Präfix, offline-friendlich, kein Server-Session-State nötig).
-  `ask()` / `ask_async()` halten `history` (role, text). Getestet via
-  `test_conversation_threads_history`.
-- **D — MCP `idun_token` Tool + Diff-Parallelisierung:** `idun_token` inspiziert den
-  Token-State OHNE Secret (valid, expires_in_seconds, account). Router `/api/diff`
-  läuft beide Completions jetzt parallel (ThreadPoolExecutor, statt sequenziell).
-- **C — Live MCP-Test (Phase 6 offen, geschlossen):** `idun_chat`/`idun_trace`/
-  `idun_token` über das stdio-MCP-Wire getestet → echte Foundry-Antwort
-  ("Die Hauptstadt von Griechenland ist Athen."). Dabei Bug gefunden + gefixt:
-  `_tool_chat`/`_tool_trace` machten `dict(IdunResult)` (dataclass, nicht iterable)
-  → jetzt `res.text`/`res.steps`/`res.model` direkt (v0.1.23).
+---
 
-PyPI: v0.1.22 (A+B+D) + v0.1.23 (C-Bugfix) live. idun-MCP bei Hermes: 7/7 Tools
-enabled (6 + idun_token). Hinweis: Hermes lädt das MCP-Binary erst nach NEUER
-Session / Reload — der in-session Call nutzt ggf. noch den Cache.
+## 6. v1.0 — DONE
 
-Offen (unblockiert, optional):
-- ~~Strukturierter `input` als Message-Liste statt Text-Präfix (falls Foundry
-  server-seitige Conversation unterstützt).~~ **ERLEDIGT** (v0.1.28: `complete_messages()`
-  + `Conversation` baut Foundry-Message-List `[{role,content:[{type,text}]}]`; live
-  verifiziert dass Foundry Multi-Turn aus der Liste ableitet. 22/22 Tests grün.)
-- ~~Side-by-side-Diff als eigenes MCP-Tool (`idun_diff` existiert bereits als CLI).~~ **ERLEDIGT**
-  (`idun_diff` ist seit v0.1.21 als MCP-Tool live: nimmt `prompt_a`/`prompt_b`/`format`,
-  vergleicht Agent-Trajectories side-by-side. Live verifiziert 2026-08-03 via stdio:
-  2 echte Prompts → Steps A:20/B:9, Shared:0, Unique A:7/B:3.)
+15. **CI matrix** — DONE. `.github/workflows/ci.yml` runs the offline suite
+    across Python 3.8–3.14, a native Termux/aarch64 container job, and a ruff
+    lint job.
+16. **Type coverage** — DONE. `idun/py.typed` (PEP 561) shipped and registered
+    in `setup.py` `package_data`; full annotations on the public API.
+17. **Documentation** — DONE. README.md rewritten for v1.0 (config, structured
+    output, chains, themes, discovery, MCP parity, async, security). This
+    roadmap finalized.
+18. **Post-install verification** — DONE. `test.sh` builds a fresh wheel,
+    installs into a `mktemp` temp dir with trap-cleanup, runs the offline suite
+    against the isolated install, then asserts `idun` / `idun-multi` /
+    `idun-mcp` resolve to this package. `install.sh` checks Python ≥ 3.8 + pip
+    and installs editable (no-deps). Real E2E run caught + fixed an
+    `args.json` regression in the streaming path.
+19. **Security pass** — DONE (and documented in README "Security"). Secrets via
+    `getpass`, never argv; token files 0600 in a 0700 dir; error bodies
+    redacted before logs; `_require_http_url` SSRF guard (no `file://`); no
+    bundled tenant/resource; token inspection secret-free.
 
-## Release-Historie (2026-08-02/03, live verifiziert)
+---
 
-- **v0.1.22** — A (retry/backoff 5xx/429), B (Conversation), D (idun_token MCP + router /api/diff parallel).
-- **v0.1.23** — C-Bugfix: `IdunResult` ist kein dict → `res.text`/`res.steps`/`res.model` direkt.
-- **v0.1.24** — (3a) `idun run` Batch: `run_pack`, CLI `--all`, MCP `keys`/`all`.
-- **v0.1.25** — `run_pack` Resilienz (per-Prompt-Fehler isoliert).
-- **v0.1.26** — CR-Fixes (fp-None guard im retry, narrow token-inspect except). *Shadow-Release, nicht auf main gemergt.*
-- **v0.1.27** — Sync: main == PyPI (holt 0.1.26 CR-Fixes rein, Version-Konsistenz).
-- **v0.1.28** — `complete_messages()`: `Conversation` nutzt server-seitige Foundry-Message-List (kein Text-Präfix mehr); 22/22 Tests grün.
-- **v0.1.29** — CLI `--help` Examples für alle 10 Subcommands (argparse description).
-- **v0.1.30** — `fix(welcome)`: Screen-Reset nach cmatrix erzwingen, damit ASCII-Banner sauber rendert; `test_welcome.py` (3 Tests) grün.
-- **v0.1.31** — Hermetische Test-Suite: `maybe_refresh` im Offline gestubbt + `cmatrix` nur auf echtem TTY → behebt den 180s-Hang; 25/25 Tests grün. **Aktueller Stand.**
-- PyPI: https://pypi.org/project/idun-sdk/ — alle Versionen live (inkl. 0.1.36).
-  Hinweis: git-Tags hinkten hinterher (nur bis v0.1.31 getaggt) — am
-  2026-08-15 nachgeholt (v0.1.32–v0.1.37), damit Tag-Historie == PyPI passt.
+## 7b. Post-v1.0 maintenance (v1.0.1 → v1.0.6) — DONE
 
-## Release-Historie (Fortsetzung, 2026-08-15 synchronisiert)
+Follow-up fixes that shipped after the original v1.0 sign-off:
 
-- **v0.1.32** — Multi-Backend-Doku (README/llms.txt) + PyPI-Bump.
-- **v0.1.33** — Vollständige Install/Setup-Anleitung für alle Backends; License-Feld.
-- **v0.1.34** — MCP-Version-Sync, `run_pack`-Default vereinheitlicht.
-- **v0.1.35** — `idun hf`-CLI + HF-Pipeline (whoami/status/push), live gegen Hub verifiziert.
-- **v0.1.36** — Cleanup/Repo-Hygiene. **BEKANNTER DEFEKT:** `__init__.__version__`
-  blieb auf `0.1.31` gepinnt (nur `setup.py` wurde pro Release gebumpt) →
-  jedes veröffentlichte Wheel meldete fälschlich `0.1.31` als eigene Version.
-- **v0.1.37** — **Fix:** Single-Source-Version (`setup.py` liest `__version__` aus
-  `idun/__init__.py`). **Ollama (local-model) Backend entfernt** — Multi-Backend-Fokus
-  liegt auf `azure` / `hf` / `github`. 44/44 Tests grün, Wheel meldet korrekt `0.1.37`.
-  Lokal committet + getaggt; **Push + PyPI-Upload ausstehend** (GitHub/PyPI-Auth in
-  dieser Session nicht verfügbar — Blocker, kein Fake).
+1. **Welcome → wizard redirect removed (v1.0.6)** — `idun welcome` no longer
+   auto-launched the interactive setup wizard (the "broken redirect": the
+   banner would drop the user straight into a blocking `input()` prompt they
+   could not exit). `show_welcome_then_wizard()` was deleted; `cmd_welcome`
+   now only renders the banner and points the user at `idun wizard`.
+2. **Wizard UX rework (v1.0.6)** — `idun wizard` gained:
+   - **More choice** — added option `5) other` for ANY generic
+     OpenAI-compatible endpoint (base URL + key + model), so non-listed
+     vendors work with zero registry changes.
+   - **Skip** — `s` keeps registry defaults (no provider written); only
+     prompts for the theme.
+   - **Quit** — `q` / empty / Ctrl-C / EOF at any prompt aborts cleanly
+     (rc 0, no config written, shell left usable). The wizard is now
+     exit-able.
+   - **TTY safety** — a piped / non-interactive invocation exits 1 with a
+     clear message instead of hanging on `input()`.
+   Tests: `tests/test_wizard.py` (5 cases) + regression guard in
+   `tests/test_welcome.py`.
+3. **cmatrix dependency removed (v1.0.7)** — the optional `cmatrix` matrix
+   rain Easter egg was fully deleted (no `subprocess`/`shutil.which` spawn, no
+   `force_cmatrix` param, no install_requires entry). It was the recurring
+   install/runtime breaker. `idun welcome` now renders the pure ASCII banner
+   only and still guarantees a usable shell via the hard terminal reset.
+   `tests/test_welcome.py` rewritten without any cmatrix reference.
+4. **Polish pass (v1.0.8)** — wrapped up the P1–P5 backlog:
+   - **P1 wizard test-call** — a failed probe now prints a neutral hint
+     instead of a red error (key-not-live is expected, not a failure).
+   - **P2 README** — "What's in the box" bumped to v1.0.8; `idun welcome`
+     listed as pure-ASCII banner, `idun wizard` as always-exit-able.
+   - **P3 changelog** — `CHANGELOG.md` introduced; this roadmap marked FINAL
+     and points there for release notes.
+   - **P4 neutral naming** — last `QMFI` reference removed; public artifacts
+     stay tenant/resource-free. `setup.py` description fixed 13→17 providers.
+   - **P5 provider expansion** — added `perplexity`, `fireworks`, `novita`
+     (OpenAI-compatible). Registry now ships **17 providers**; README table +
+     counts updated.
 
-## v0.1.37 — Ollama entfernt + Version-Single-Source (lokal fertig, publish offen)
-- **Ollama-Rewrite:** `complete_ollama` + `OLLAMA_*`-Konstanten + Dispatch entfernt aus
-  `backends.py`; `VALID_BACKENDS = ("azure", "hf", "github")`. `IdunClient`, CLI
-  `--backend`-choices, Wizard und `idun info` haben keinen ollama-Zweig mehr.
-- **Version-Drift gefixt:** `setup.py` liest `__version__` aus `idun/__init__.py`
-  (keine Import-Seiteneffekte). Damit kann `setup.py` künftig nicht mehr vom
-  Package-Version abweichen.
-- **Dok-Sync:** README, llms.txt, setup.py description aktualisiert (kein ollama mehr).
-- **Tests:** `test_multi_backend.py` ollama-Tests durch `unknown-backend`-Abweisung ersetzt.
-- **Verify (lokal):** `sh run_tests.sh` → 44 passed; `idun_sdk-0.1.37-py3-none-any.whl`
-  enthält `__version__ = "0.1.37"` (Drift behoben). Build-Artefakte in `dist/`.
+---
 
-## v0.1.38 — OpenAI-Backend + OpenAPI (live auf PyPI)
-- **OpenAI-Backend:** `complete_openai()` ruft jeden OpenAI-compatible
-  `/v1/chat/completions`-Endpoint (api.openai.com default, via `OPENAI_BASE`
-  overridebar für vLLM/LiteLLM-Proxies). `IdunClient` + CLI (`--backend openai`,
-  Wizard, `idun info`) + `idun openapi`-Kommando. Token via `OPENAI_API_KEY` /
-  `~/openai_token.txt`.
-- **OpenAPI:** `idun/openapi.json` — gebündelte OpenAPI-3.0-Spec der
-  Completion-Surface (OpenAI-kompatibles Request/Response-Shape), per
-  `idun openapi` (bzw. `--path`) auslieferbar. Packaged im Wheel.
-- **Tests:** 47/47 grün (openai dispatch-shape, token-required, valid-backends).
-- **Live verifiziert:** PyPI latest = 0.1.38, wheel meldet 0.1.38, openapi.json
-  im Wheel (curl-E2E).
+## 7. Risk register
 
-## Phase 7 — Contoso Expo 2027 (Showcase-Ziel)
+| Risk | Mitigation |
+|---|---|
+| Console-script name `idun` is generic and gets hijacked (F1) | doctor check (item 4); `test.sh` asserts scripts resolve to this package |
+| Provider model slugs rot (F5) | live model discovery (item 13) |
+| Hardcoded Azure resource in the registry default | RESOLVED in v0.2.1 |
+| API keys in plaintext under `~/.idun` | 0600 (atomic in v0.2.2) |
+| API key leaks via argv / process table | RESOLVED in v0.2.2 (`getpass` only) |
+| Rate limits during `race` | backoff (item 8) + cache (item 7) |
+| Secrets in provider error bodies | RESOLVED in v0.2.2 (redaction) |
+| `file://` SSRF via malicious `IDUN_*_BASE` | RESOLVED in v1.0 (`_require_http_url`) |
 
-- Das `expo.html` im Playground konsumiert die SDK-Prompt-Pack-Oberfläche
-  (`list_packs` / `load_pack` / `get_prompt` / `run_pack`) über den Router
-  (`/api/expo`, `/api/packs`, `/api/run`) — SDK-Parity bleibt die einzige
-  Live-Schicht, kein neuer Code im SDK nötig.
-- Das `contoso_pack.json` (`idun/data/prompt_packs/`) ist die Demo-Quelle für
-  die Expo-Demos (Nachhaltigkeit, ESG, Web-Recherche, Wettbewerb). Neue
-  `*.json`-Packs erscheinen automatisch im Expo — kein UI-Change nötig.
+---
+
+## 8. Post-v1.0 backlog (future, not blocking)
+
+1. **Cost accounting** (item 5) — per-provider price table for `race`.
+   **DONE in v1.0.13** (`cost_table()` + `estimate_cost()` in `idun.providers`;
+   `idun-multi race` shows a `cost*` column; `idun-multi cost` prints the table).
+   Prices are approximate public list prices, explicitly labelled "not a bill".
+2. **Provider expansion** — DONE in v1.0.8 (Perplexity, Fireworks, Novita added;
+   registry now ships 17 providers). Further vendors still possible via `5) other`
+   in the wizard or one `Provider()` row.
+3. **OS keyring** backend for credentials — DONE in v1.0.10 (`idun.keyring_store`,
+   opt-in via `IDUN_KEYRING=1` or config; strictly secondary to the file store).
+4. **Support matrix docs** — DONE in v1.0.11 (`SUPPORT_MATRIX.md`, generated from
+   `idun.providers.support_matrix()`; live via `idun-multi support`).
+5. **Vision + function calling** — DONE in v1.0.12 (`complete(images=...,
+   tools=...)` wired through the `openai` + `anthropic` transports;
+   `Completion.tool_calls`; CLI `--image`/`--tools`/`--tool-choice`).
+6. **`idun chat` live session** — DONE in v1.0.14 (`idun chat` with no prompt
+   prints an "IDUN ONLINE" console header and drops into a REPL instead of
+   dumping the argparse error; `exit`/`quit`/`q`/Ctrl-C ends cleanly).
+
+> §8 is now **fully shipped** (v1.0.6 → v1.0.14). The SDK is feature-complete
+> for the v1.0.x line. Release-by-release detail lives in
+> [CHANGELOG.md](./CHANGELOG.md); this document is the planning record.
