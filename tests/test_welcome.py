@@ -1,9 +1,12 @@
 """Offline tests for idun.welcome (no cmatrix spawn, no network).
 
-Covers the bug where, on a TTY, cmatrix -s (alternate screen) leaves a frozen
-frame behind when killed by the timeout, painting over the ASCII-art banner so
-only the two bright text lines survived. The fix forces a screen reset after
-cmatrix returns, before the banner is printed.
+Covers the bug where, on a TTY, cmatrix leaves a frozen frame behind when
+killed by the timeout, painting over the ASCII-art banner so only the two
+bright text lines survived. The fix (a) does NOT use cmatrix -s (screensaver
+mode restores the *original* main screen on a clean key exit, which can drop
+our banner), (b) forces a screen reset after cmatrix returns, and (c) clears
++ homes the cursor again before printing the banner so it always lands on a
+visible main screen.
 """
 import io
 import sys

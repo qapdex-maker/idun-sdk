@@ -70,11 +70,14 @@ def _run_cmatrix() -> None:
     # full timeout, hanging the test suite. Bail early in that case.
     if not sys.stdout.isatty():
         return
-    # -s screensaver mode (exits on first keystroke); -u delay; -C colour.
-    cmd = ["cmatrix", "-s", "-u", "4", "-C", _CMATRIX_COLOR]
+    # NOT using -s (screensaver mode): in -s, cmatrix restores the *original*
+    # main screen on a clean key-press exit and then our reset+banner land on
+    # a screen it has already torn down, so the banner can vanish. Plain mode
+    # (-u delay, -C colour) uses the alternate screen normally and returns to
+    # the main screen cleanly on SIGTERM/timeout, which is what we reset below.
+    cmd = ["cmatrix", "-u", "4", "-C", _CMATRIX_COLOR]
     try:
-        # Screensaver mode bails on any key; we also cap with a hard timeout
-        # so non-interactive/CI runs never hang.
+        # Cap with a hard timeout so non-interactive/CI runs never hang.
         subprocess.run(cmd, timeout=_CMATRIX_SECONDS + 2,
                        check=False, stdin=sys.stdin)
     except Exception:
@@ -85,15 +88,16 @@ def _run_cmatrix() -> None:
 def _reset_screen() -> None:
     """Return to the main screen and clear it, regardless of cmatrix exit path.
 
-    `cmatrix -s` switches to the terminal's alternate screen buffer. When it is
+    `cmatrix` switches to the terminal's alternate screen buffer. When it is
     killed by our timeout (SIGTERM) instead of exiting on a key press, it may
     NOT emit the "leave alternate screen" escape, so the frozen matrix frame
     stays on the visible screen and would overwrite the banner printed next.
     Forcing the reset here makes the welcome robust to both exit paths.
     """
     try:
-        # 1049l: leave alt screen | 2J: clear | H: home cursor | 0m: reset color
-        sys.stdout.write("\033[?1049l\033[2J\033[H\033[0m")
+        # 1049l: leave alt screen | 25h: show cursor | 2J: clear | H: home
+        # cursor | 0m: reset color
+        sys.stdout.write("\033[?1049l\033[?25h\033[2J\033[H\033[0m")
         sys.stdout.flush()
     except Exception:
         pass
@@ -105,6 +109,9 @@ def show_welcome(force_cmatrix: bool = False) -> None:
     if interactive or force_cmatrix:
         _run_cmatrix()
         _reset_screen()  # clean slate whether cmatrix exited cleanly or was killed
+    # Ensure the banner starts on a fresh, visible main screen: clear + home
+    # again, then print. (Idempotent with _reset_screen above.)
+    sys.stdout.write("\033[2J\033[H")
     sys.stdout.write(_BANNER)
     sys.stdout.write("\n")
     sys.stdout.flush()
