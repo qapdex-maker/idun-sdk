@@ -4,6 +4,14 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.9] — 2026-08-17
+
+### Fixed
+- **PyPI `summary` corrected** 14→17 providers in `setup.py` long description
+  (the 1.0.8 wheel shipped the registry with 17 providers but described it as
+  14). No code changes; version bump only so PyPI accepts the corrected
+  metadata (PyPI releases are immutable).
+
 ## [1.0.8] — 2026-08-17
 
 ### Added
