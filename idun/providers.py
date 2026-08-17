@@ -88,13 +88,31 @@ class Provider:
 
     def resolved_base(self) -> str:
         # Azure keeps its established IDUN_BASE name; others use IDUN_<ID>_BASE.
+        # Env wins over ~/.idun/config.toml over the registry default.
+        from . import config as _cfg
         if self.id == "azure":
-            return (os.environ.get("IDUN_BASE")
-                    or os.environ.get(self.base_env()) or self.base)
-        return os.environ.get(self.base_env(), self.base)
+            env = os.environ.get("IDUN_BASE") or os.environ.get(self.base_env())
+            if env:
+                return env
+        else:
+            env = os.environ.get(self.base_env())
+            if env:
+                return env
+        cfg = _cfg.config_provider_base(self.id)
+        if cfg:
+            return cfg
+        return self.base
 
     def resolved_model(self) -> str:
-        return os.environ.get(self.model_env(), self.default_model)
+        # Env wins over ~/.idun/config.toml over the registry default.
+        from . import config as _cfg
+        env = os.environ.get(self.model_env())
+        if env:
+            return env
+        cfg = _cfg.config_provider_model(self.id)
+        if cfg:
+            return cfg
+        return self.default_model
 
 
 # --------------------------------------------------------------------------
@@ -265,16 +283,28 @@ def get_provider(pid: str) -> Provider:
 
 
 def resolve_credential(p: Provider) -> str:
-    """Return the API key for a provider from env, then ~/.idun/<id>.token."""
+    """Return the API key for a provider.
+
+    Resolution order: env key -> ``~/.idun/<id>.token`` file -> config.toml
+    ``[<id>] api_key``. The token file stays the preferred secret store; the
+    config key is a convenience for non-sensitive endpoints.
+    """
     for key in p.env_keys:
         val = os.environ.get(key)
         if val:
             return val.strip()
     try:
         with open(p.token_file, encoding="utf-8") as fh:
-            return fh.read().strip()
+            tok = fh.read().strip()
+            if tok:
+                return tok
     except OSError:
-        return ""
+        pass
+    from . import config as _cfg
+    cfg_key = _cfg.config_provider_key(p.id)
+    if cfg_key:
+        return cfg_key
+    return ""
 
 
 def save_credential(p: Provider, token: str) -> str:

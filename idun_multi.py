@@ -34,7 +34,15 @@ RC_PATH = os.path.join(os.path.expanduser("~"), ".idunrc")
 
 
 def _active(args) -> str:
-    return (getattr(args, "provider", "") or P.default_provider())
+    flag = getattr(args, "provider", "") or P.default_provider()
+    if flag and flag != "azure":
+        return flag
+    # respect a [defaults] provider = ... entry in ~/.idun/config.toml
+    from idun import config as _cfg
+    cfg_default = _cfg.config_default_provider()
+    if cfg_default:
+        return cfg_default
+    return flag or "azure"
 
 
 def _provider_rows() -> list[tuple]:
