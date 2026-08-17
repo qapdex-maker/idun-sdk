@@ -11,9 +11,10 @@ non-interactive.
 Public API:
     maybe_welcome()  -> call once at CLI startup; shows the welcome at most
                         once per user (guarded by a flag file).
-    show_welcome()   -> always show it (used by `idun welcome`).
-    show_welcome_then_wizard(args) -> welcome, then drop straight into the
-                        setup wizard (used by `idun welcome`).
+    show_welcome()   -> always show it (used by `idun welcome`). The matching
+                        setup wizard lives at the standalone `idun wizard`
+                        command and is never auto-launched from here, so the
+                        welcome can never redirect into an interactive prompt.
 """
 from __future__ import annotations
 
@@ -22,7 +23,7 @@ import shutil
 import subprocess
 import sys
 
-__all__ = ["maybe_welcome", "show_welcome", "show_welcome_then_wizard"]
+__all__ = ["maybe_welcome", "show_welcome"]
 
 # shortest-path term width (avoid importing retro just for this)
 def _term_width(default: int = 80) -> int:
@@ -209,24 +210,6 @@ def show_welcome(force_cmatrix: bool = False) -> None:
         _hard_reset()          # undo cmatrix's cursor-hide / alt-screen
     _print_welcome_art()       # draw on a guaranteed-clean, visible screen
     _hard_reset()              # final guarantee: cursor visible, shell usable
-
-
-def show_welcome_then_wizard(args) -> None:
-    """Welcome, then drop straight into the setup wizard.
-
-    The hard terminal reset is guaranteed in a ``finally`` block so the shell
-    is never left with a hidden cursor / stuck alternate screen, even if the
-    wizard is aborted (Ctrl-C / EOF) or raises.
-    """
-    from idun_cli import cmd_wizard
-    try:
-        show_welcome(force_cmatrix=True)
-        return cmd_wizard(args)
-    except (EOFError, KeyboardInterrupt):
-        # user bailed out of the wizard — fine, just leave a clean shell
-        return
-    finally:
-        _hard_reset()
 
 
 def maybe_welcome() -> None:

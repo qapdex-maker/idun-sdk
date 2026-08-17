@@ -1,14 +1,16 @@
 """Offline tests for idun.welcome (no cmatrix spawn, no network, no TTY).
 
-Covers the two real bugs reported from Termux:
+Covers the real bug reported from Termux:
 
 1. Terminal-state break: cmatrix hid the cursor (?25l) and could leave the
    alternate screen active, so after `idun welcome` the shell prompt came back
    but input was invisible ("bash is broken"). The fix is a *hard* reset
-   (?25h + ?1049l + 2J + H + 0m + RIS) emitted both after cmatrix and in a
-   finally block around the wizard.
+   (?25h + ?1049l + 2J + H + 0m + RIS) emitted both after cmatrix and at the
+   end of show_welcome().
 
-2. `idun welcome` should drop straight into the setup wizard.
+2. `idun welcome` must NOT auto-launch the setup wizard. The wizard lives at
+   the standalone `idun wizard` command; show_welcome() only renders the
+   banner (+ optional matrix). show_welcome_then_wizard was removed.
 
 The ascii art (own block banner + world-tree motif) must render even when
 cmatrix is unavailable / non-interactive.
@@ -76,22 +78,23 @@ def test_show_welcome_renders_art_without_cmatrix(monkeypatch):
     assert "idun-sdk" in out
 
 
-def test_show_welcome_then_wizard_invokes_cmd_wizard(monkeypatch, capsys):
-    # stub cmatrix + reset so nothing touches the terminal
+def test_show_welcome_does_not_launch_wizard(monkeypatch):
+    """The welcome screen must render only; no wizard import / call.
+    (regression guard for the removed broken redirect)
+    """
     monkeypatch.setattr(welcome, "_run_cmatrix", lambda: None)
     monkeypatch.setattr(welcome, "_hard_reset", lambda: None)
-    # stub the wizard so we just confirm it is called and the shell stays clean
-    called = {}
-
-    def fake_wizard(args):
-        called["yes"] = True
-        # mimic the real wizard writing its intro + asking (would block on TTY)
-        raise EOFError("simulated non-tty input")
-    monkeypatch.setattr("idun_cli.cmd_wizard", fake_wizard)
-    # idun_cli imports welcome; patch the attribute it will look up
     import idun_cli
-    monkeypatch.setattr(idun_cli, "cmd_wizard", fake_wizard)
-
-    # should not raise even though the wizard bails on EOF
-    welcome.show_welcome_then_wizard(object())
-    assert called.get("yes") is True, "wizard must be invoked by show_welcome_then_wizard"
+    # ensure the now-removed symbol is gone and cmd_welcome only renders
+    assert not hasattr(welcome, "show_welcome_then_wizard"), \
+        "show_welcome_then_wizard must be removed (no redirect)"
+    buf = io.StringIO()
+    old = sys.stdout
+    sys.stdout = buf
+    try:
+        welcome.show_welcome(force_cmatrix=True)
+    finally:
+        sys.stdout = old
+    assert "the world-tree" in buf.getvalue()
+    # the welcome command path must not import cmd_wizard from welcome
+    assert "cmd_wizard" not in welcome.__all__

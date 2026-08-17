@@ -123,8 +123,10 @@ def cmd_openapi(args):
 
 
 def cmd_welcome(_args):
-    from idun.welcome import show_welcome_then_wizard
-    return show_welcome_then_wizard(_args)
+    from idun.welcome import show_welcome
+    show_welcome(force_cmatrix=sys.stdout.isatty())
+    UI.info("Run `idun wizard` for first-run setup, or `idun chat` to begin.")
+    return 0
 
 
 def cmd_status(_args):
@@ -210,11 +212,21 @@ def cmd_hf(args):
 def cmd_wizard(_args):
     """Universal first-run setup wizard.
 
-    Picks a backend, captures credentials, lets the user choose a retro theme,
-    writes everything to ``~/.idun/config.toml`` (benign settings) + the
-    per-provider ``.token`` file (secrets, mode 0600), and finally runs a short
-    test call to prove the credentials work before finishing.
+    Picks a backend (or any generic OpenAI-compatible endpoint), captures
+    credentials, lets the user choose a retro theme, writes everything to
+    ``~/.idun/config.toml`` + the per-provider ``.token`` file, and runs a
+    short test call. The backend step can be SKIPPED (keep registry defaults)
+    and the wizard can be QUIT at any prompt (type ``q`` or Ctrl-C / EOF) with
+    no changes and a clean shell.
     """
+    # TTY safety: a piped / non-interactive invocation must never hang or crash.
+    if not sys.stdin.isatty():
+        UI.err(
+            "`idun wizard` needs an interactive TTY. Run it in a real terminal, "
+            "or set credentials via `idun login --backend X` / environment vars."
+        )
+        return 1
+
     from idun import config as C
     from idun.retro import list_themes
 
@@ -222,62 +234,94 @@ def cmd_wizard(_args):
         "1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.",
         "2) hf      — Hugging Face Inference API (free tier, needs HF token).",
         "3) github  — GitHub Models (free tier, needs GitHub PAT).",
-        "4) openai  — OpenAI-compatible /v1/chat/completions (needs OPENAI_API_KEY).",
+        "4) openai  — OpenAI /v1/chat/completions (needs OPENAI_API_KEY).",
+        "5) other   — ANY OpenAI-compatible endpoint (URL + key, any vendor).",
+        "s) skip    — keep registry defaults, only pick a theme.",
+        "q) quit    — exit without changing anything.",
     ]
     UI.wizard_intro(choices)
-    choice = input("Select backend [1-4]: ").strip()
-    mapping = {"1": "azure", "2": "hf", "3": "github", "4": "openai"}
-    backend = mapping.get(choice, "azure")
-    UI.info(f"Selected: {backend}")
 
-    cfg: dict = {"defaults": {"provider": backend}}
+    def _read(prompt: str) -> str:
+        """Read one line; 'q' / Ctrl-C / EOF aborts the wizard cleanly."""
+        try:
+            return input(prompt).strip()
+        except (EOFError, KeyboardInterrupt):
+            return "q"
 
-    if backend == "azure":
-        UI.info("Azure setup: point the SDK at YOUR tenant + Foundry resource.")
-        base = input("IDUN_BASE (https://<resource>.services.ai.azure.com): ").strip()
-        if base:
-            os.environ["IDUN_BASE"] = base
-            cfg["defaults"]["base"] = base
-        project = input("IDUN_PROJECT (Foundry project name) [optional]: ").strip()
-        if project:
-            cfg["defaults"]["project"] = project
-        tenant = input("IDUN_TENANT (tenant guid) [optional]: ").strip()
-        if tenant:
-            cfg["defaults"]["tenant"] = tenant
-        UI.info("Run `idun login --backend azure` to complete the device-code flow.")
-    elif backend == "hf":
-        tok = input("Hugging Face token (hf_...) [or blank for anonymous]: ").strip()
-        if tok:
-            _save_backend_token("hf", tok)
-        model = input(f"HF model [default: {get_provider('hf').default_model}]: ").strip()
-        if model:
-            cfg["hf"] = {"model": model}
-    elif backend == "github":
-        tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
-        if not tok:
-            UI.err("GitHub backend requires a PAT. Aborting.")
-            return 1
-        _save_backend_token("openai", tok)
-        model = input(f"GitHub model [default: {get_provider('openai').default_model}]: ").strip()
-        if model:
-            cfg["openai"] = {"model": model}
-    elif backend == "openai":
-        tok = input("OpenAI API key (sk-...) [or blank for OPENAI_API_KEY env]: ").strip()
-        if tok:
+    choice = _read("Select backend [1-5, s=skip, q=quit]: ").lower()
+    if choice in ("q", "quit", ""):
+        UI.info("Wizard aborted — no changes made.")
+        return 0
+
+    if choice in ("s", "skip"):
+        UI.info("Skipping backend setup; keeping registry defaults.")
+        cfg: dict = {"defaults": {}}
+    else:
+        mapping = {"1": "azure", "2": "hf", "3": "github",
+                   "4": "openai", "5": "other"}
+        backend = mapping.get(choice, "azure")
+        cfg = {"defaults": {"provider": backend}}
+
+        if backend == "azure":
+            UI.info("Azure setup: point the SDK at YOUR tenant + Foundry resource.")
+            base = _read("IDUN_BASE (https://<resource>.services.ai.azure.com): ")
+            if base:
+                os.environ["IDUN_BASE"] = base
+                cfg["defaults"]["base"] = base
+            project = _read("IDUN_PROJECT (Foundry project name) [optional]: ")
+            if project:
+                cfg["defaults"]["project"] = project
+            tenant = _read("IDUN_TENANT (tenant guid) [optional]: ")
+            if tenant:
+                cfg["defaults"]["tenant"] = tenant
+            UI.info("Run `idun login --backend azure` to complete the device-code flow.")
+        elif backend == "hf":
+            tok = _read("Hugging Face token (hf_...) [or blank for anonymous]: ")
+            if tok:
+                _save_backend_token("hf", tok)
+            model = _read(f"HF model [default: {get_provider('hf').default_model}]: ")
+            if model:
+                cfg["hf"] = {"model": model}
+        elif backend == "github":
+            tok = _read("GitHub PAT (ghp_... / github_pat_...): ")
+            if not tok:
+                UI.err("GitHub backend requires a PAT. Aborting.")
+                return 1
             _save_backend_token("openai", tok)
-        model = input(f"OpenAI model [default: {get_provider('openai').default_model}]: ").strip()
-        if model:
-            cfg["openai"] = dict(cfg.get("openai", {}), model=model)
-        base = input(f"OpenAI base URL [default: {get_provider('openai').base}]: ").strip()
-        if base:
-            cfg["openai"] = dict(cfg.get("openai", {}), base=base)
+            model = _read(f"GitHub model [default: {get_provider('openai').default_model}]: ")
+            if model:
+                cfg["openai"] = {"model": model}
+        elif backend == "openai":
+            tok = _read("OpenAI API key (sk-...) [or blank for OPENAI_API_KEY env]: ")
+            if tok:
+                _save_backend_token("openai", tok)
+            model = _read(f"OpenAI model [default: {get_provider('openai').default_model}]: ")
+            if model:
+                cfg["openai"] = dict(cfg.get("openai", {}), model=model)
+            base = _read(f"OpenAI base URL [default: {get_provider('openai').base}]: ")
+            if base:
+                cfg["openai"] = dict(cfg.get("openai", {}), base=base)
+        elif backend == "other":
+            UI.info("Generic OpenAI-compatible endpoint (any vendor).")
+            base = _read("Base URL (https://<host>/v1): ")
+            if not base:
+                UI.err("A base URL is required for 'other'. Aborting.")
+                return 1
+            tok = _read("API key [or blank to read OPENAI_API_KEY env]: ")
+            model = _read("Model id [optional]: ")
+            os.environ["OPENAI_BASE"] = base
+            cfg["openai"] = {"base": base}
+            if tok:
+                _save_backend_token("openai", tok)
+            if model:
+                cfg["openai"]["model"] = model
 
-    # theme pick
+    # theme pick (harmless; empty -> keep 'classic' default)
     themes = list_themes()
     UI.info("Retro themes: " + ", ".join(themes))
-    theme = input("Theme [default: classic]: ").strip().lower()
+    theme = _read("Theme [default: classic]: ").lower()
     if theme and theme in themes:
-        cfg["defaults"]["theme"] = theme
+        cfg.setdefault("defaults", {})["theme"] = theme
         try:
             from idun.retro import set_theme
             set_theme(theme)
@@ -292,9 +336,10 @@ def cmd_wizard(_args):
         pass
     UI.ok(f"Wrote config -> {path}")
 
-    # smoke test to prove the credentials work
-    _wizard_test_call(backend)
-    UI.info('Done. Try:  idun chat "Hello"')
+    # smoke test to prove the credentials work (skip when backend was skipped)
+    if cfg.get("defaults", {}).get("provider"):
+        _wizard_test_call(cfg["defaults"]["provider"])
+    UI.info("Done. Try:  idun chat \"Hello\"")
     return 0
 
 
