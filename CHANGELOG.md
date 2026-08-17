@@ -4,6 +4,17 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.14] — 2026-08-17
+
+### Changed
+- **`idun chat` is now a live interactive session.** Running `idun chat`
+  with no prompt prints an "IDUN ONLINE" console header (logo + a "console
+  live" status line) and drops into a REPL — type a prompt, get the answer,
+  repeat. `exit` / `quit` / `q` / Ctrl-C / EOF ends the session cleanly.
+  This replaces the previous behaviour where a missing prompt just dumped the
+  argparse error. `idun chat "..."` still does a single one-shot call as before.
+  New `idun._cli_retro.chat_intro()` renders the live header.
+
 ## [1.0.13] — 2026-08-17
 
 ### Added

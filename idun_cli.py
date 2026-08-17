@@ -6,6 +6,7 @@ Usage:
   idun login  --backend hf    # store backend credentials
   idun status                 # show active backend + credential state
   idun chat  --backend github "your prompt"   # print final answer
+  idun chat                              # live interactive session (REPL)
   idun trace "your prompt"    # print agent trajectory (azure only, with steps)
   idun token [--status|--refresh|-f]   # inspect / rotate the stored Azure token
 
@@ -91,11 +92,39 @@ def cmd_login(args):
 
 
 def cmd_chat(args):
-    res = _run(args, args.prompt)
-    UI.chat_out(res.text, model=res.model,
-                backend=getattr(args, "backend", None)
-                or os.environ.get("IDUN_BACKEND")
-                or os.environ.get("IDUN_PROVIDER") or "azure")
+    prompt = " ".join(args.prompt).strip() if isinstance(args.prompt, list) else (args.prompt or "")
+    backend = (getattr(args, "backend", None)
+               or os.environ.get("IDUN_BACKEND")
+               or os.environ.get("IDUN_PROVIDER") or "azure")
+    if prompt:
+        res = _run(args, prompt)
+        UI.chat_out(res.text, model=res.model, backend=backend)
+        return
+    # No prompt -> live interactive session (running mood, not the help dump).
+    UI.chat_intro(backend)
+    import signal
+
+    def _quit(_sig, _frm):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGINT, _quit)
+    try:
+        while True:
+            try:
+                line = input("idun> ").strip()
+            except EOFError:
+                print(file=sys.stderr)
+                break
+            if not line or line.lower() in ("exit", "quit", "q"):
+                break
+            try:
+                res = _run(args, line)
+            except (RuntimeError, ValueError) as e:
+                UI.err(str(e))
+                continue
+            UI.chat_out(res.text, model=res.model, backend=backend)
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+    UI.info("session closed.")
 
 
 def cmd_trace(args):
@@ -484,7 +513,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="print final answer",
         description="Send a prompt and print only the final answer text.\n\nExample:\n  idun chat \"What is the capital of France?\"\n  idun chat --backend github \"Summarize quantum computing\"\n  idun chat --async \"Explain transformers\"",
     )
-    pc.add_argument("prompt")
+    pc.add_argument("prompt", nargs="?", default="")
     _add_common_args(pc)
     pc.set_defaults(func=cmd_chat)
 

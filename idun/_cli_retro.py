@@ -22,6 +22,20 @@ def banner() -> None:
     print(R.rule(role="frame"), file=sys.stderr)
 
 
+def chat_intro(backend: str = "azure") -> None:
+    """Print the 'IDUN online' live console header before an interactive chat.
+
+    Gives `idun chat` (no prompt) an active, running mood instead of dumping
+    the help text — a pulsing status line plus a short hint on how to drive it.
+    """
+    print(R.logo(), file=sys.stderr)
+    print(R.rule(role="frame"), file=sys.stderr)
+    print(R.header("IDUN ONLINE", f"{backend} · interactive session"), file=sys.stderr)
+    print(R.status("ok", "console live — type a prompt, 'exit' or Ctrl-C to quit"),
+          file=sys.stderr)
+    print(R.rule(role="frame"), file=sys.stderr)
+
+
 def chat_out(text: str, model: str = "", backend: str = "") -> None:
     """Render a chat/trace answer in a retro response box + typewriter."""
     meta = " · ".join(p for p in (backend, model) if p)
