@@ -1260,3 +1260,48 @@ def support_matrix_text() -> str:
             f"{_mark(r['tools'])} | {_mark(r['vision'])} | {_mark(r['json_mode'])} |"
         )
     return "\n".join(lines)
+
+
+# --------------------------------------------------------------------------
+# Cost accounting (rough list-price estimates for `idun-multi race`)
+# --------------------------------------------------------------------------
+#
+# These are APPROXIMATE public list prices (USD per 1,000 tokens of input /
+# output) as a convenience for comparing providers in `race`. They are NOT a
+# billing source — actual charges depend on your plan, region, caching, and
+# batch discounts. Providers without a public list price (azure Foundry
+# NatureLM-Idun, self-hosted ollama/local, HF Inference varies) are omitted
+# and `estimate_cost` returns None for them.
+_COST_TABLE: dict[str, dict] = {
+    "openai":     {"in": 0.00015, "out": 0.00060},  # gpt-4o-mini list
+    "anthropic":  {"in": 0.00300, "out": 0.01500},  # claude-sonnet-4 list
+    "groq":       {"in": 0.00059, "out": 0.00079},  # llama-3.3-70b list
+    "openrouter": {"in": 0.00050, "out": 0.00050},  # common open model
+    "together":    {"in": 0.00088, "out": 0.00088},  # llama-3.3-70b list
+    "deepseek":   {"in": 0.00055, "out": 0.00219},  # deepseek-chat list
+    "mistral":     {"in": 0.00030, "out": 0.00090},  # ministral list
+    "gemini":     {"in": 0.00010, "out": 0.00040},  # gemini-flash list
+    "xai":        {"in": 0.00050, "out": 0.00150},  # grok-2 list (approx)
+    "perplexity": {"in": 0.00100, "out": 0.00100},  # sonar list
+    "fireworks":   {"in": 0.00090, "out": 0.00090},  # llama-3.3-70b list
+    "novita":      {"in": 0.00030, "out": 0.00030},  # llama list (approx)
+    # nous / hf / azure / ollama / local: no public list price -> omitted
+}
+
+
+def cost_table() -> dict[str, dict]:
+    """Return the approximate per-1K-token price table (copy)."""
+    return {k: dict(v) for k, v in _COST_TABLE.items()}
+
+
+def estimate_cost(pid: str, prompt_tokens: int, completion_tokens: int) -> float | None:
+    """Estimate USD cost for a completion on `pid` from the list-price table.
+
+    Returns None when the provider has no public list price (e.g. azure,
+    self-hosted, HF). The number is a rough comparison aid only.
+    """
+    row = _COST_TABLE.get(pid)
+    if not row:
+        return None
+    return round(prompt_tokens / 1000 * row["in"]
+                 + completion_tokens / 1000 * row["out"], 6)

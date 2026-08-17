@@ -55,6 +55,7 @@ idun-multi models --discover            # live model list for the active provide
 idun-multi theme c64                     # switch retro palette
 idun-multi doctor                       # env + credential + console-script audit
 idun-multi support                      # per-provider capability matrix
+idun-multi cost                        # approximate list-price table (USD/1K tok)
 ```
 
 ### First-run setup wizard
@@ -206,6 +207,16 @@ Tool calls the model returns are normalized to OpenAI shape and attached to
 `--json`). The Azure Foundry agent tool-trace is a separate feature surfaced via
 the `idun` CLI / `IdunClient`. See **[SUPPORT_MATRIX.md](./SUPPORT_MATRIX.md)**
 for exactly which transport supports what.
+
+## Cost comparison
+
+`idun-multi race` fans one prompt at every ready provider and prints latency,
+token count **and an estimated cost** (`cost*` column). `idun-multi cost` prints
+the full approximate list-price table (USD per 1,000 input/output tokens). These
+are rough public list prices for comparison only — **not a bill**; actual
+charges depend on your plan, region, caching and batch discounts. Self-hosted
+(`ollama`/`local`), Azure Foundry (`azure`, NatureLM-Idun) and HF Inference have
+no public list price and show `n/a`.
 
 ## Fallback chains
 

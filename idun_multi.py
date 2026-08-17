@@ -279,24 +279,37 @@ def cmd_race(args) -> int:
     for pid in pids:
         res = results.get(pid)
         if isinstance(res, Exception):
-            rows.append((pid, "-", "-", R.paint("FAILED", "err")))
+            rows.append((pid, "-", "-", R.paint("FAILED", "err"), "-"))
         else:
+            cost = P.estimate_cost(pid, res.prompt_tokens, res.completion_tokens)
+            cost_s = f"${cost:.6f}" if cost is not None else "n/a"
             rows.append((pid, f"{res.latency_ms} ms",
                          str(res.total_tokens or "-"),
-                         R.paint("ok", "ok")))
+                         R.paint("ok", "ok"), cost_s))
     print()
-    print(R.table(rows, headers=("provider", "latency", "tokens", "state")))
+    print(R.table(rows, headers=("provider", "latency", "tokens", "state", "cost*")))
     print()
+    print(R.status("info",
+                   "cost* = rough list-price estimate (USD); not a bill. "
+                   "See `idun-multi cost` for the full table."))
+    return 0
 
-    for pid in pids:
-        res = results.get(pid)
-        if isinstance(res, Exception):
-            msg = " ".join(str(res).split())
-            print(R.box([msg[:160]], title=f"{pid} — ERROR", role="err"))
-        else:
-            body = res.text.strip().split("\n")[: args.lines] or ["(empty)"]
-            print(R.box(body, title=f"{pid} — {res.model} ({res.latency_ms} ms)"))
-        print()
+
+def cmd_cost(_args) -> int:
+    """Print the approximate per-1K-token list-price table."""
+    from idun.providers import cost_table
+    print(R.header("IDUN COST TABLE", "approximate public list prices (USD / 1K tok)"))
+    print()
+    rows = []
+    for pid, row in sorted(cost_table().items()):
+        rows.append((pid, f"${row['in']:.5f}", f"${row['out']:.5f}"))
+    print(R.table(rows, headers=("provider", "input/1K", "output/1K")))
+    print()
+    print(R.status("warn",
+                   "Approximate list prices only — not a bill. Actual charges "
+                   "depend on plan, region, caching, batch discounts. Self-hosted "
+                   "(ollama/local), Azure Foundry (NatureLM-Idun) and HF Inference "
+                   "have no public list price and are omitted."))
     return 0
 
 
@@ -718,6 +731,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--max-tokens", type=int, default=512, dest="max_tokens")
     sp.add_argument("--timeout", type=int, default=120)
     sp.set_defaults(func=cmd_race)
+
+    sp = sub.add_parser("cost", help="show the approximate list-price table")
+    sp.set_defaults(func=cmd_cost)
 
     sp = sub.add_parser("doctor", help="environment and credential audit")
     sp.set_defaults(func=cmd_doctor)

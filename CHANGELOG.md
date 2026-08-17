@@ -4,6 +4,23 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.13] — 2026-08-17
+
+### Added
+- **Cost accounting for `idun-multi race`** (last open §8 backlog item). New
+  helpers in `idun.providers`:
+  - `cost_table()` — approximate public list prices (USD per 1,000 input /
+    output tokens) for the 12 providers with a public list price.
+  - `estimate_cost(pid, prompt_tokens, completion_tokens)` — returns the
+    estimated USD cost, or `None` for providers with no public list price
+    (azure Foundry / NatureLM-Idun, self-hosted ollama/local, HF Inference).
+  - `idun-multi race` now prints a **cost\*** column per contender; `idun-multi
+    cost` prints the full table. Prices are explicitly labelled an approximation
+    ("not a bill") — actual charges depend on plan, region, caching, discounts.
+
+### Chore
+- ROADMAP §8 marked fully done (all backlog items shipped across v1.0.6–v1.0.13).
+
 ## [1.0.12] — 2026-08-17
 
 ### Added

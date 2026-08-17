@@ -174,7 +174,9 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
 ## 8. Post-v1.0 backlog (future, not blocking)
 
 1. **Cost accounting** (item 5) — per-provider price table for `race`.
-   *(still open — the only remaining §8 item)*
+   **DONE in v1.0.13** (`cost_table()` + `estimate_cost()` in `idun.providers`;
+   `idun-multi race` shows a `cost*` column; `idun-multi cost` prints the table).
+   Prices are approximate public list prices, explicitly labelled "not a bill".
 2. **Provider expansion** — DONE in v1.0.8 (Perplexity, Fireworks, Novita added;
    registry now ships 17 providers). Further vendors still possible via `5) other`
    in the wizard or one `Provider()` row.
