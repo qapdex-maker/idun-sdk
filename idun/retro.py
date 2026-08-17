@@ -68,6 +68,98 @@ ROLE = {
     "text": "white",
 }
 
+# -------------------------------------------------------------------------
+# Theme system (v0.5) — selectable retro palettes via IDUN_THEME.
+# Each theme is a full ROLE mapping. The default is the original 16-colour
+# "classic" palette above; the others evoke a specific machine.
+# -------------------------------------------------------------------------
+
+THEMES = {
+    "classic": dict(ROLE),  # the original 16-colour SNES/Amiga-ish palette
+    "c64": {
+        # Commodore 64: blue background, light-blue frame, cyan text
+        "frame": "bright_blue",
+        "title": "bright_cyan",
+        "accent": "bright_yellow",
+        "ok": "bright_green",
+        "warn": "bright_yellow",
+        "err": "bright_red",
+        "muted": "bright_black",
+        "text": "bright_cyan",
+    },
+    "gameboy": {
+        # Game Boy DMG-01: four-shade green-on-green (mapped to ANSI greens)
+        "frame": "green",
+        "title": "bright_green",
+        "accent": "bright_yellow",
+        "ok": "bright_green",
+        "warn": "yellow",
+        "err": "bright_red",
+        "muted": "bright_black",
+        "text": "green",
+    },
+    "amiga": {
+        # Amiga Workbench: blue title bar feel, white text
+        "frame": "blue",
+        "title": "bright_white",
+        "accent": "bright_cyan",
+        "ok": "bright_green",
+        "warn": "yellow",
+        "err": "bright_red",
+        "muted": "bright_black",
+        "text": "white",
+    },
+    "cga": {
+        # IBM CGA: magenta/cyan on black, the classic 80s PC look
+        "frame": "magenta",
+        "title": "cyan",
+        "accent": "bright_white",
+        "ok": "bright_green",
+        "warn": "bright_yellow",
+        "err": "bright_red",
+        "muted": "bright_black",
+        "text": "bright_white",
+    },
+}
+
+_ACTIVE_THEME = "classic"
+
+
+def list_themes() -> list[str]:
+    """Available theme ids (pass one to ``set_theme`` or ``IDUN_THEME``)."""
+    return sorted(THEMES)
+
+
+def set_theme(name: str) -> str:
+    """Activate a theme by id; falls back to 'classic' for unknown ids.
+
+    Returns the actually-active theme id (handy for confirming a typo-safe
+    default). Honours ``IDUN_THEME`` only at module import time via
+    ``_apply_env_theme()``; this function is the explicit override.
+    """
+    global _ACTIVE_THEME, ROLE
+    key = (name or "").strip().lower()
+    if key not in THEMES:
+        key = "classic"
+    _ACTIVE_THEME = key
+    ROLE = dict(THEMES[key])
+    return _ACTIVE_THEME
+
+
+def theme() -> str:
+    """Currently active theme id."""
+    return _ACTIVE_THEME
+
+
+def _apply_env_theme() -> None:
+    """Pick up IDUN_THEME at import so `export IDUN_THEME=gameboy` just works."""
+    env = os.environ.get("IDUN_THEME")
+    if env:
+        set_theme(env)
+
+
+_apply_env_theme()
+
 
 def paint(text: str, *roles: str, stream=None) -> str:
     """Wrap text in ANSI codes for the given roles/colour names."""

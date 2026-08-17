@@ -318,6 +318,7 @@ def cmd_doctor(_args) -> int:
         f"rc file     : {RC_PATH}"
         + (" (present)" if os.path.exists(RC_PATH) else " (absent)"),
         f"colour      : {'on' if R.color_enabled() else 'off'}",
+        f"theme       : {R.theme()}",
     ]
     print(R.box(lines, title="ENVIRONMENT"))
     print()
@@ -558,6 +559,21 @@ def cmd_schema(args) -> int:
     return 0
 
 
+def cmd_theme(args) -> int:
+    """Show or switch the active retro theme (classic/c64/gameboy/amiga/cga)."""
+    if getattr(args, "name", ""):
+        active = R.set_theme(args.name)
+        print(R.status("ok", f"theme -> {active}"))
+    else:
+        active = R.theme()
+    rows = [(tid, R.paint("active", "ok") if tid == active else "")
+            for tid in R.list_themes()]
+    print(R.box(
+        R.table(rows, headers=("theme", "state")).split("\n"),
+        title="RETRO THEMES  (set IDUN_THEME or `idun-multi theme <name>`)"))
+    return 0
+
+
 def cmd_banner(_args) -> int:
     print(R.logo(VERSION))
     print()
@@ -642,6 +658,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("schema", help="show the JSON response schema")
     sp.set_defaults(func=cmd_schema)
+
+    sp = sub.add_parser("theme", help="show or switch the retro theme")
+    sp.add_argument("name", nargs="?", default="",
+                    help="theme id: classic|c64|gameboy|amiga|cga")
+    sp.set_defaults(func=cmd_theme)
 
     sp = sub.add_parser("wizard", help="interactive setup")
     sp.set_defaults(func=cmd_wizard)
