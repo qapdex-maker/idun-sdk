@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](https://pypi.org/project/idun-sdk/)
 [![stdlib-only](https://img.shields.io/badge/stdlib--only-%E2%9C%93-7c3aed.svg)](https://pypi.org/project/idun-sdk/)
 
-**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 13-provider registry, a 16-bit retro console, and an MCP server that exposes the whole registry.**
+**Thin, stdlib-only client + CLI for the [NatureLM-Idun-5-MoE](https://ai.azure.com/nextgen/agents/daf452cd-804f-41ed-9cfe-cb8f73140d4e/preview?version=11) agent on Azure AI Foundry — plus a 14-provider registry, a 16-bit retro console, and an MCP server that exposes the whole registry.**
 
 Runs headless on Termux/Android with nothing but the Python standard library
 (no `httpx`, no `azure-identity`, no Flask). Idun is a **tool agent** (reasons +
@@ -15,7 +15,7 @@ calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 
 ## What's in the box (v1.0)
 
-- **13-provider registry** over 3 transports (OpenAI-compatible, Anthropic,
+- **14-provider registry** over 3 transports (OpenAI-compatible, Anthropic,
   Hugging Face). Any OpenAI-compatible endpoint works with zero code changes.
 - **`idun-multi`** — a 16-colour ANSI "16-bit" console with provider switching,
   credential wizard, model discovery, fallback chains, themes, and a REPL.
@@ -43,7 +43,7 @@ idun-multi doctor             # env + credential + console-script audit
 ```
 
 ```bash
-idun-multi providers                    # all 13 providers + credential state
+idun-multi providers                    # all 14 providers + credential state
 idun-multi login --provider groq        # hidden prompt -> ~/.idun/groq.token (0600)
 idun-multi ask "explain MoE routing"    # active provider
 idun-multi -p openrouter ask "hi"       # one-off provider
@@ -65,6 +65,7 @@ idun-multi doctor                       # env + credential + console-script audi
 | `mistral` | openai | `MISTRAL_API_KEY` | paid |
 | `gemini` | openai | `GEMINI_API_KEY` | free tier |
 | `xai` | openai | `XAI_API_KEY` | paid |
+| `nous` | openai | `NOUS_API_KEY` | free tier |
 | `hf` | hf inference | `HF_TOKEN` (optional) | free |
 | `ollama` | openai | none (local) | free |
 | `local` | openai | none | free |

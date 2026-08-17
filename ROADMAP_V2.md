@@ -37,8 +37,8 @@ v0.2.5 Nous + resume, v0.2.6 streaming + REPL, v0.2.7 retire backends.py.)
 5. **Cost accounting** — *deferred*: not in scope for v1.0. The `race` command
    reports latency + token counts; a price table would be a registry-only
    addition later. (No provider-agnostic public price API; left for a follow-up.)
-6. **Provider expansion** — Nous Research added in v0.2.5. v1.0 ships 13
-   providers; new OpenAI-compatible endpoints are one `Provider(...)` row.
+6. **Provider expansion** — Nous Research added in v0.2.5. v1.0 ships 14
+   providers (incl. Nous); new OpenAI-compatible endpoints are one `Provider(...)` row.
 
 ---
 
@@ -129,6 +129,6 @@ v0.2.5 Nous + resume, v0.2.6 streaming + REPL, v0.2.7 retire backends.py.)
 
 1. **Cost accounting** (item 5) — per-provider price table for `race`.
 2. **Provider expansion** — Perplexity, Fireworks, Novita, etc. (one `Provider`
-   row each).
+   row each). v1.0 ships 14 providers (incl. Nous Research / Hermes).
 3. **OS keyring** backend for credentials (optional, behind the file store).
 4. **Support matrix docs** — streaming / tools / vision / JSON mode per provider.
