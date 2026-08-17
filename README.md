@@ -276,6 +276,13 @@ for concurrent fan-out.
 - **Secrets are never on the command line.** `idun-multi login` reads keys with
   `getpass` (hidden input); they are written to `~/.idun/<id>.token` (mode 0600,
   inside a 0700 dir), never echoed, never logged.
+- **Optional OS keyring (opt-in).** If you install the `keyring` package and set
+  `IDUN_KEYRING=1` (or `secrets_backend = "keyring"` in `~/.idun/config.toml`),
+  credentials are additionally mirrored to your OS credential store (Keychain /
+  Credential Manager / Secret Service). The file store stays primary and always
+  wins; the keyring is a secondary fallback and is only consulted when no
+  file/env/config secret exists. No third-party dependency is required unless
+  you opt in. `idun-multi doctor` reports the active secret backend.
 - **Error bodies are sanitised.** Upstream error responses are truncated and
   scrubbed before they reach stderr/logs, so a token accidentally echoed by a
   provider is never relayed back.

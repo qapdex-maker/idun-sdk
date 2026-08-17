@@ -6,15 +6,16 @@ from .client import (IdunClient, IdunResult, Step, _normalize_output,
 from .auth import login, load_token, maybe_refresh
 from .prompts import list_packs, load_pack, get_prompt, run_pack
 from . import providers, retro
+from . import keyring_store
 from .providers import (Completion, Provider, complete, get_provider,
                         list_providers)
 
 __all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_refresh",
            "_normalize_output", "logo_path", "openapi_path", "list_packs", "load_pack", "get_prompt",
            "diff_traces", "format_diff", "Conversation", "run_pack",
-           "providers", "retro", "Provider", "Completion", "complete",
+           "providers", "retro", "keyring_store", "Provider", "Completion", "complete",
            "get_provider", "list_providers"]
-__version__ = "1.0.9"
+__version__ = "1.0.10"
 
 
 def logo_path(variant: str = "white") -> str:

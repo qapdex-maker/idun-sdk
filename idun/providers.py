@@ -344,9 +344,11 @@ def get_provider(pid: str) -> Provider:
 def resolve_credential(p: Provider) -> str:
     """Return the API key for a provider.
 
-    Resolution order: env key -> ``~/.idun/<id>.token`` file -> config.toml
-    ``[<id>] api_key``. The token file stays the preferred secret store; the
-    config key is a convenience for non-sensitive endpoints.
+    Resolution order: env key -> ``~/.idun/<id>.token`` file ->
+    ``[<id>] api_key`` in config.toml -> **OS keyring** (opt-in, secondary).
+    The token file stays the preferred secret store; the keyring is consulted
+    only as a last resort when enabled, so there is never a surprise about
+    where a secret lives.
     """
     for key in p.env_keys:
         val = os.environ.get(key)
@@ -363,6 +365,14 @@ def resolve_credential(p: Provider) -> str:
     cfg_key = _cfg.config_provider_key(p.id)
     if cfg_key:
         return cfg_key
+    # opt-in OS keyring (secondary, non-fatal)
+    try:
+        from .keyring_store import load_keyring
+        kr = load_keyring(p)
+        if kr:
+            return kr
+    except Exception:
+        pass
     return ""
 
 
@@ -374,6 +384,9 @@ def save_credential(p: Provider, token: str) -> str:
     umask (typically 0644) before a separate chmod. A missing/permissive
     ~/.idun is tightened to 0700; failure there is non-fatal because the file
     itself is already owner-only.
+
+    When the OS keyring backend is opted in, the same token is also mirrored to
+    the keyring (best-effort; a keyring failure never fails the file write).
     """
     os.makedirs(CONFIG_DIR, exist_ok=True)
     try:
@@ -387,16 +400,28 @@ def save_credential(p: Provider, token: str) -> str:
     except BaseException:
         os.unlink(p.token_file)
         raise
+    # optional mirror to the OS keyring (non-fatal)
+    try:
+        from .keyring_store import store_keyring
+        store_keyring(p, token)
+    except Exception:
+        pass
     return p.token_file
 
 
 def credential_status(p: Provider) -> str:
-    """Human-readable credential state: env / file / none / n-a."""
+    """Human-readable credential state: env / file / keyring / none / n-a."""
     for key in p.env_keys:
         if os.environ.get(key):
             return f"env:{key}"
     if os.path.exists(p.token_file):
         return "file"
+    try:
+        from .keyring_store import keyring_status
+        if keyring_status(p):
+            return "keyring"
+    except Exception:
+        pass
     return "none" if p.needs_key else "not-required"
 
 

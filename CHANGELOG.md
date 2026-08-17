@@ -4,6 +4,27 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.10] — 2026-08-17
+
+### Added
+- **Optional OS keyring backend (P4 backlog item).** New module
+  `idun.keyring_store` mirrors credentials to the OS credential store (macOS
+  Keychain / Windows Credential Manager / Secret Service) when opted in via
+  `IDUN_KEYRING=1` or `secrets_backend = "keyring"` in config.toml **and** the
+  `keyring` package is installed. It is strictly secondary: the file store
+  (`~/.idun/<id>.token`, 0600) stays primary and always wins; the keyring is
+  consulted only as a last-resort fallback. Zero third-party dependencies unless
+  the user opts in. Every helper is non-fatal (returns `""`/`False` on any
+  failure), so a missing/locked keyring never breaks resolution. Exposed in the
+  public API (`idun.keyring_store`) and reported by `idun-multi doctor`
+  ("secrets: file only" vs "keyring (opt-in)").
+- **Tests:** `tests/test_keyring.py` (9 cases) — opt-in gating, store
+  round-trip, resolve fall-through / file-precedence, save-mirror, status,
+  and safe-degradation when the package is absent.
+
+### Chore
+- README Security section documents the opt-in keyring backend.
+
 ## [1.0.9] — 2026-08-17
 
 ### Fixed

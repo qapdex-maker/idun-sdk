@@ -174,7 +174,9 @@ Follow-up fixes that shipped after the original v1.0 sign-off:
 ## 8. Post-v1.0 backlog (future, not blocking)
 
 1. **Cost accounting** (item 5) — per-provider price table for `race`.
-2. **Provider expansion** — Perplexity, Fireworks, Novita, etc. (one `Provider`
-   row each). v1.0 ships 14 providers (incl. Nous Research / Hermes).
-3. **OS keyring** backend for credentials (optional, behind the file store).
+2. **Provider expansion** — DONE in v1.0.8 (Perplexity, Fireworks, Novita added;
+   registry now ships 17 providers). Further vendors still possible via `5) other`
+   in the wizard or one `Provider()` row.
+3. **OS keyring** backend for credentials — DONE in v1.0.10 (`idun.keyring_store`,
+   opt-in via `IDUN_KEYRING=1` or config; strictly secondary to the file store).
 4. **Support matrix docs** — streaming / tools / vision / JSON mode per provider.

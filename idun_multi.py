@@ -327,6 +327,13 @@ def cmd_doctor(_args) -> int:
         f"colour      : {'on' if R.color_enabled() else 'off'}",
         f"theme       : {R.theme()}",
     ]
+    # secret store: file (default) + optional OS keyring (opt-in)
+    try:
+        from idun.keyring_store import keyring_enabled
+        kr = "keyring (opt-in)" if keyring_enabled() else "file only"
+    except Exception:
+        kr = "file only"
+    lines.append(f"secrets     : {kr}")
     print(R.box(lines, title="ENVIRONMENT"))
     print()
 
