@@ -41,3 +41,18 @@ def _fake_azure_config(monkeypatch):
     monkeypatch.setenv("IDUN_PROJECT", FAKE_PROJECT)
     monkeypatch.setenv("IDUN_TENANT", FAKE_TENANT)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cache(monkeypatch, tmp_path_factory):
+    """Route the response cache to a per-session temp dir.
+
+    Since v0.4 ``complete()`` caches under ``~/.idun/cache``. Without this
+    fixture a prior run (or an interactive call) could leave a real cache
+    entry that a later test would wrongly serve as a hit — masking transport
+    mocks. Pointing CACHE_DIR at a fresh temp dir keeps every test hermetic.
+    Tests that explicitly exercise caching patch CACHE_DIR themselves.
+    """
+    import idun.providers as P
+    monkeypatch.setattr(P, "CACHE_DIR", str(tmp_path_factory.mktemp("idun-cache")))
+    yield
