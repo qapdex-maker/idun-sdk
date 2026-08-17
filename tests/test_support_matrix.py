@@ -26,16 +26,24 @@ def test_matrix_json_mode_matches_schema_rule():
 
 def test_matrix_known_shapes():
     rows = {r["id"]: r for r in support_matrix()}
-    # azure: tool-agent -> streaming + tools + json
+    # azure: tool-agent -> streaming + json; complete() itself is text-only
+    # (the agent tool-trace is surfaced via IdunClient, not complete()).
     assert rows["azure"]["streaming"] is True
-    assert rows["azure"]["tools"] is True
+    assert rows["azure"]["tools"] is False
     assert rows["azure"]["json_mode"] is True
-    # openai transport: streaming + json, no tools / vision
+    # openai transport: streaming + json + tools + vision (wired through complete())
     assert rows["groq"]["streaming"] is True
     assert rows["groq"]["json_mode"] is True
-    assert rows["groq"]["tools"] is False
-    # anthropic / hf: nothing special
+    assert rows["groq"]["tools"] is True
+    assert rows["groq"]["vision"] is True
+    # anthropic: tools + vision, no streaming / json_mode
     assert rows["anthropic"]["streaming"] is False
+    assert rows["anthropic"]["tools"] is True
+    assert rows["anthropic"]["vision"] is True
+    assert rows["anthropic"]["json_mode"] is False
+    # hf: nothing
+    assert rows["hf"]["streaming"] is False
+    assert rows["hf"]["json_mode"] is False
     assert rows["anthropic"]["json_mode"] is False
     assert rows["hf"]["streaming"] is False
     assert rows["hf"]["json_mode"] is False

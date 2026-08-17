@@ -56,7 +56,7 @@ def test_stream_falls_back_for_non_openai(monkeypatch):
     # return a generator yielding the full response as a single chunk.
     monkeypatch.setattr(P, "_TRANSPORTS", {
         **P._TRANSPORTS,
-        "anthropic": lambda *a, **k: {"content": [{"text": "full answer"}],
+        "anthropic": lambda *a, **k: {"content": [{"type": "text", "text": "full answer"}],
                                        "usage": {"input_tokens": 1,
                                                  "output_tokens": 1}},
     })

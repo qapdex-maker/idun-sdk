@@ -4,6 +4,30 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.12] — 2026-08-17
+
+### Added
+- **Vision + function calling wired through `complete()`.** New optional
+  parameters `images: list[str]` and `tools: list[dict]` (plus `tool_choice`)
+  on `idun.providers.complete()`. They are forwarded to the `openai` and
+  `anthropic` transports:
+  - **Vision** — `images` builds multimodal content blocks: OpenAI `image_url`
+    blocks, Anthropic `image` blocks (base64 for local files, url for
+    http(s)/data: URIs). `hf` and the Azure `complete()` path stay text-only.
+  - **Tools** — `tools` enables function calling. OpenAI gets the schemas
+    verbatim; Anthropic gets them converted to its `input_schema` shape. Provider
+    tool calls are normalized and returned on the new `Completion.tool_calls`
+    field (OpenAI shape). `_extract_tool_calls()` handles both dialects.
+- **CLI** — `idun-multi ask` gains `--image` (repeatable), `--tools` (inline
+  JSON or a path to a JSON file of OpenAI-style tool defs), and `--tool-choice`.
+  Tool calls are rendered (and included in `--json`) on the response.
+- **Tests:** `tests/test_vision_tools.py` (6 cases) verifies image-block
+  building, Anthropic schema conversion, and tool_calls normalization — all
+  offline via a mocked `_post_json`.
+- **Docs:** `SUPPORT_MATRIX.md` regenerated; vision + tools now show ✓ for
+  `openai`/`anthropic` (and the 13 openai-transport providers), azure/`complete()`
+  stays text-only (its agent tool-trace is a separate `IdunClient` feature).
+
 ## [1.0.11] — 2026-08-17
 
 ### Added

@@ -187,6 +187,26 @@ idun-multi support
  "total_tokens": 30, "latency_ms": 412, "raw": {...}}
 ```
 
+## Vision & function calling
+
+`idun-multi ask` (and `idun.providers.complete`) support multimodal input and
+tool use on the **`openai`** and **`anthropic`** transports:
+
+```bash
+# vision: http(s) URL, data: URI, or a local file (base64-encoded automatically)
+idun-multi ask "What is in this chart?" --image ./chart.png
+
+# function calling: inline JSON or a path to a JSON file of OpenAI-style tools
+idun-multi ask "Get the weather in Paris" \
+  --tools './tools.json' --tool-choice auto
+```
+
+Tool calls the model returns are normalized to OpenAI shape and attached to
+`Completion.tool_calls` (also printed after the response, and present in
+`--json`). The Azure Foundry agent tool-trace is a separate feature surfaced via
+the `idun` CLI / `IdunClient`. See **[SUPPORT_MATRIX.md](./SUPPORT_MATRIX.md)**
+for exactly which transport supports what.
+
 ## Fallback chains
 
 `IDUN_CHAIN` lists providers to try in order; the first one that returns a

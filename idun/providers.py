@@ -48,6 +48,11 @@ class Completion:
     completion_tokens: int = 0
     latency_ms: int = 0
     raw: dict = field(default_factory=dict, repr=False)
+    # tool calls returned by the provider (OpenAI `tool_calls` / Anthropic
+    # `tool_use` blocks). Populated only when `complete(..., tools=[...])` was
+    # requested; each entry is a provider-native dict
+    # (OpenAI: {"id","type":"function","function":{"name","arguments"}}).
+    tool_calls: list[dict] = field(default_factory=list, repr=False)
 
     @property
     def total_tokens(self) -> int:
@@ -63,6 +68,7 @@ class Completion:
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
             "latency_ms": self.latency_ms,
+            "tool_calls": self.tool_calls,
         }
         return d
 
@@ -578,13 +584,20 @@ def _post_json(url: str, body: dict, headers: dict, timeout: int) -> dict:
 def _call_openai(p: Provider, prompt: str, model: str, token: str, *,
                  system: str = "", temperature: float = 0.7,
                  max_tokens: int = 1024, timeout: int = 120,
-                 history: list[dict] | None = None) -> dict:
-    messages = _build_messages(system, prompt, history)
+                 history: list[dict] | None = None,
+                 images: list[str] | None = None,
+                 tools: list[dict] | None = None,
+                 tool_choice: str | dict | None = None) -> dict:
+    messages = _build_messages(system, prompt, history, images=images)
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     body = {"model": model, "messages": messages,
             "max_tokens": max_tokens, "temperature": temperature}
+    if tools:
+        body["tools"] = tools
+        if tool_choice is not None:
+            body["tool_choice"] = tool_choice
     return _post_json(f"{p.resolved_base().rstrip('/')}/chat/completions",
                       body, headers, timeout)
 
@@ -651,31 +664,66 @@ def _stream_openai(p: Provider, model: str, token: str, messages: list[dict],
 def _call_anthropic(p: Provider, prompt: str, model: str, token: str, *,
                     system: str = "", temperature: float = 0.7,
                     max_tokens: int = 1024, timeout: int = 120,
-                    history: list[dict] | None = None) -> dict:
+                    history: list[dict] | None = None,
+                    images: list[str] | None = None,
+                    tools: list[dict] | None = None,
+                    tool_choice: str | dict | None = None) -> dict:
     headers = {
         "Content-Type": "application/json",
         "x-api-key": token,
         "anthropic-version": "2023-06-01",
     }
-    messages = _build_messages(system, prompt, history, drop_system=True)
+    # Anthropic messages: history as-is, then a final user turn (multimodal).
+    messages: list[dict] = []
+    if history:
+        for m in history:
+            if isinstance(m, dict) and "role" in m and "content" in m:
+                role = m["role"]
+                if role not in ("user", "assistant"):
+                    role = "user"
+                messages.append({"role": role, "content": m["content"]})
+    if images:
+        content = [{"type": "text", "text": prompt}]
+        for img in images:
+            content.append(_image_block_anthropic(img))
+        messages.append({"role": "user", "content": content})
+    else:
+        messages.append({"role": "user", "content": prompt})
     body = {"model": model, "max_tokens": max_tokens,
             "temperature": temperature, "messages": messages}
     if system:
         body["system"] = system
+    if tools:
+        # Anthropic tool schema uses `input_schema`, not OpenAI's `parameters`.
+        body["tools"] = [_anthropic_tool(t) for t in tools]
+        if tool_choice is not None:
+            body["tool_choice"] = tool_choice
     return _post_json(f"{p.resolved_base().rstrip('/')}/messages",
                       body, headers, timeout)
+
+
+def _anthropic_tool(t: dict) -> dict:
+    """Convert an OpenAI-style tool def to Anthropic's shape."""
+    fn = t.get("function", t)
+    return {"name": fn.get("name", ""),
+            "description": fn.get("description", ""),
+            "input_schema": fn.get("parameters", {}) or {}}
 
 
 def _call_hf(p: Provider, prompt: str, model: str, token: str, *,
              system: str = "", temperature: float = 0.7,
              max_tokens: int = 1024, timeout: int = 120,
-             history: list[dict] | None = None) -> dict:
+             history: list[dict] | None = None,
+             images: list[str] | None = None,
+             tools: list[dict] | None = None,
+             tool_choice: str | dict | None = None) -> dict:
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    # HF Inference API has no system-message field. Prepend the system prompt
-    # to the user input; this is approximate but keeps the instruction visible
-    # to models whose chat template expects a leading system turn.
+    # HF Inference API is text-only (no system turn, no images, no tools).
+    # `images`/`tools` are accepted for signature uniformity but ignored; a
+    # caller that needs vision/function-calling should use an openai or
+    # anthropic transport provider instead.
     inputs = prompt
     if system:
         inputs = f"{system}\n\n{prompt}"
@@ -689,7 +737,8 @@ def _call_hf(p: Provider, prompt: str, model: str, token: str, *,
 
 def _build_messages(system: str, prompt: str,
                     history: list[dict] | None,
-                    drop_system: bool = False) -> list[dict]:
+                    drop_system: bool = False,
+                    images: list[str] | None = None) -> list[dict]:
     """Assemble the message list from (optional) system + history + new user turn.
 
     ``history`` is a list of ``{"role": ..., "content": ...}`` dicts exactly as
@@ -697,6 +746,14 @@ def _build_messages(system: str, prompt: str,
     passing the stored ``messages`` back in. The new user ``prompt`` is always
     appended last. When ``drop_system`` is set (Anthropic) the system turn is
     omitted here because the caller passes it as a top-level field instead.
+
+    ``images`` is a list of image refs (http(s) URL, ``data:`` URI, or a local
+    file path). They are attached to the final user turn as multimodal content
+    blocks: OpenAI uses ``{"type": "image_url", "image_url": {"url": ...}}``;
+    Anthropic uses ``{"type": "image", "source": {"type": "url"/"base64", ...}}``
+    (base64 for local files). A plain ``prompt`` without images keeps the
+    simple ``{"role": "user", "content": str}`` shape so non-vision providers
+    are untouched.
     """
     messages: list[dict] = []
     if system and not drop_system:
@@ -709,16 +766,76 @@ def _build_messages(system: str, prompt: str,
                 if role not in ("system", "user", "assistant"):
                     role = "user"
                 messages.append({"role": role, "content": m["content"]})
-    messages.append({"role": "user", "content": prompt})
+    # build the final user turn (multimodal if images present)
+    if images:
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for img in images:
+            content.append(_image_block(img))
+        messages.append({"role": "user", "content": content})
+    else:
+        messages.append({"role": "user", "content": prompt})
     return messages
 
 
+def _image_block(img: str) -> dict:
+    """Build a multimodal content block for one image ref (OpenAI dialect).
+
+    Local paths are read and base64-encoded; data: URIs and http(s) URLs are
+    passed through. Returns the OpenAI ``image_url`` block; callers that need
+    the Anthropic shape convert it via ``_image_block_anthropic``.
+    """
+    if img.startswith("data:"):
+        url = img
+    elif img.startswith("http://") or img.startswith("https://"):
+        url = img
+    else:
+        # local file -> base64 data URI
+        import base64
+        with open(img, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode("ascii")
+        # infer mime from extension (best-effort)
+        ext = img.rsplit(".", 1)[-1].lower() if "." in img else "png"
+        mime = {
+            "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "gif": "image/gif", "webp": "image/webp",
+        }.get(ext, "image/png")
+        url = f"data:{mime};base64,{b64}"
+    return {"type": "image_url", "image_url": {"url": url}}
+
+
+def _image_block_anthropic(img: str) -> dict:
+    """Anthropic ``image`` content block for one image ref."""
+    if img.startswith("data:"):
+        # data:...;base64,<payload>
+        head, _, payload = img.partition(",")
+        mime = head.split(";")[0].replace("data:", "") or "image/png"
+        return {"type": "image", "source": {"type": "base64",
+                                             "media_type": mime, "data": payload}}
+    if img.startswith("http://") or img.startswith("https://"):
+        return {"type": "image", "source": {"type": "url", "url": img}}
+    import base64
+    with open(img, "rb") as fh:
+        b64 = base64.b64encode(fh.read()).decode("ascii")
+    ext = img.rsplit(".", 1)[-1].lower() if "." in img else "png"
+    mime = {
+        "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "gif": "image/gif", "webp": "image/webp",
+    }.get(ext, "image/png")
+    return {"type": "image", "source": {"type": "base64",
+                                        "media_type": mime, "data": b64}}
+
+
 def _extract_text(transport: str, data: object) -> str:
-    """Normalize the wildly different response shapes into plain text."""
+    """Normalize the wildly different response shapes into plain text.
+
+    Tool-use blocks (OpenAI ``tool_calls`` / Anthropic ``tool_use``) are NOT
+    surfaced here — only the assistant's text. Tool calls are extracted
+    separately by ``_extract_tool_calls`` and returned on ``Completion.tool_calls``.
+    """
     if transport == "anthropic":
         blocks = data.get("content", []) if isinstance(data, dict) else []
         return "".join(b.get("text", "") for b in blocks
-                       if isinstance(b, dict))
+                       if isinstance(b, dict) and b.get("type") == "text")
     if transport == "hf":
         if isinstance(data, list) and data:
             data = data[0]
@@ -735,6 +852,43 @@ def _extract_text(transport: str, data: object) -> str:
         except (KeyError, IndexError, TypeError):
             return json.dumps(data, ensure_ascii=False)[:400]
     return str(data)
+
+
+def _extract_tool_calls(transport: str, data: object) -> list[dict]:
+    """Pull provider-native tool calls out of a response (empty list if none)."""
+    if not isinstance(data, dict):
+        return []
+    if transport == "openai":
+        try:
+            tcs = data["choices"][0]["message"].get("tool_calls") or []
+        except (KeyError, IndexError, TypeError):
+            return []
+        out = []
+        for tc in tcs:
+            if not isinstance(tc, dict):
+                continue
+            fn = tc.get("function", {})
+            out.append({
+                "id": tc.get("id", ""),
+                "type": tc.get("type", "function"),
+                "function": {"name": fn.get("name", ""),
+                             "arguments": fn.get("arguments", "")},
+            })
+        return out
+    if transport == "anthropic":
+        blocks = data.get("content", [])
+        out = []
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "tool_use":
+                out.append({
+                    "id": b.get("id", ""),
+                    "type": "function",
+                    "function": {"name": b.get("name", ""),
+                                 "arguments": json.dumps(b.get("input", {}),
+                                                         ensure_ascii=False)},
+                })
+        return out
+    return []
 
 
 def _extract_usage(transport: str, data: object) -> tuple[int, int]:
@@ -758,17 +912,34 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
              temperature: float = 0.7, max_tokens: int = 1024,
              timeout: int = 120, history: list[dict] | None = None,
              stream: bool = False, no_cache: bool = False,
-             retries: int = 3):
+             retries: int = 3,
+             images: list[str] | None = None,
+             tools: list[dict] | None = None,
+             tool_choice: str | dict | None = None):
     """Send one prompt to a provider and return a normalized Completion.
 
     ``history`` is an optional list of prior ``{"role", "content"}`` turns; when
     given the conversation is resumed instead of starting fresh.
 
+    ``images`` (optional) attaches multimodal content to the final user turn —
+    http(s) URL, ``data:`` URI, or a local file path. Supported by the
+    ``openai`` and ``anthropic`` transports; ignored by ``hf`` and the Azure
+    Foundry client path.
+
+    ``tools`` (optional) enables function calling: pass a list of OpenAI-style
+    tool schemas (``{"type": "function", "function": {"name", "description",
+    "parameters"}}``). The provider's tool calls are returned on
+    ``Completion.tool_calls`` (normalized to OpenAI shape). ``tool_choice``
+    forwards the OpenAI/Anthropic selector (``"auto"`` / ``"none"`` / a specific
+    function). Supported by the ``openai`` and ``anthropic`` transports; ignored
+    elsewhere.
+
     With ``stream=True`` the function returns a generator instead of a
     Completion: it yields text chunks (``str``) as they arrive over SSE. Only
     the ``openai`` transport supports streaming today; every other transport
     falls back to a single-chunk yield of the full response so callers can rely
-    on the same interface. Streamed responses are never cached.
+    on the same interface. Streamed responses are never cached. (Streaming does
+    not surface ``tool_calls`` — use non-streaming when you need them.)
 
     Caching: identical (provider, model, prompt, system, history, temperature,
     max_tokens) requests hit ``~/.idun/cache`` for up to ``IDUN_CACHE_MAX_AGE``
@@ -789,6 +960,8 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
 
     if p.transport == "azure":
         # Azure Foundry keeps its own client (tool-agent trace, Entra auth).
+        # It does not take `images`/`tools` from this path; the agent tool
+        # trace is surfaced via the dedicated IdunClient instead.
         from idun.client import IdunClient  # local import: heavier deps
         res = IdunClient().complete(prompt, max_output_tokens=max_tokens)
         text = res.text
@@ -817,9 +990,9 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
             )
 
     if stream and p.transport == "openai":
-        messages = _build_messages(system, prompt, history)
+        messages = _build_messages(system, prompt, history, images=images)
         return _stream_openai(p, model, token, messages, temperature,
-                               max_tokens, timeout)
+                              max_tokens, timeout)
 
     caller = _TRANSPORTS.get(p.transport)
     if caller is None:
@@ -830,7 +1003,8 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
     data = with_retry(
         lambda: caller(p, prompt, model, token, system=system,
                        temperature=temperature, max_tokens=max_tokens,
-                       timeout=timeout, history=history),
+                       timeout=timeout, history=history, images=images,
+                       tools=tools, tool_choice=tool_choice),
         retries=retries,
     )
     latency = int((time.time() - started) * 1000)
@@ -840,6 +1014,7 @@ def complete(pid: str, prompt: str, *, model: str = "", system: str = "",
         model=model, provider=p.id, prompt_tokens=ptok,
         completion_tokens=ctok, latency_ms=latency,
         raw=data if isinstance(data, dict) else {},
+        tool_calls=_extract_tool_calls(p.transport, data),
     )
     if cache_key is not None:
         cache_put(cache_key, {
@@ -1039,14 +1214,16 @@ __all__ = [
 # These flags are derived from the actual transports in this file so the
 # docs can never drift from the code. "streaming" means true SSE token
 # streaming (openai transport); azure answers in one chunk via the agent
-# client; anthropic/hf fall back to a single-chunk yield. "tools" means the
-# SDK surfaces an agent tool trace (only the Azure tool-agent does). "vision"
-# is not wired into `complete()` for any provider yet. "json_mode" follows the
-# same rule as `cmd_schema` (openai + azure transports send response_format).
+# client; anthropic/hf fall back to a single-chunk yield. "tools" / "vision"
+# are wired through `complete()` for the openai + anthropic transports (multimodal
+# content blocks + OpenAI-style function calling). The Azure Foundry tool-agent
+# trace is surfaced separately via `IdunClient` (client.py), not via
+# `complete()`. "json_mode" follows the same rule as `cmd_schema` (openai +
+# azure transports send response_format).
 _SUPPORT_STREAMING = {"openai", "azure"}        # True SSE / single-chunk-yield
 _SUPPORT_JSONMODE = {"openai", "azure"}         # response_format accepted
-_SUPPORT_TOOLS = {"azure"}                       # agent tool trace surfaced
-_SUPPORT_VISION = set()                          # not implemented in `complete()`
+_SUPPORT_TOOLS = {"openai", "anthropic"}         # function calling via complete()
+_SUPPORT_VISION = {"openai", "anthropic"}        # multimodal content blocks
 
 
 def support_matrix() -> list[dict]:

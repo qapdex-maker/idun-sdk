@@ -59,8 +59,10 @@ def test_complete_passes_history_to_transport(monkeypatch):
     captured = {}
 
     def fake_openai(p, prompt, model, token, *, system="", temperature=0.7,
-                    max_tokens=1024, timeout=120, history=None):
+                    max_tokens=1024, timeout=120, history=None, **kwargs):
         captured["history"] = history
+        captured["images"] = kwargs.get("images")
+        captured["tools"] = kwargs.get("tools")
         captured["messages"] = [{"role": "user", "content": prompt}]
         return {"choices": [{"message": {"content": "ok"}}],
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1}}

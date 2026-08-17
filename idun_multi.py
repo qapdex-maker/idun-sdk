@@ -132,6 +132,14 @@ def _render_completion(c: P.Completion, *, raw: bool, as_json: bool = False) -> 
     print()
     R.typewriter(c.text)
     print()
+    if c.tool_calls:
+        print(R.status("tool", "tool calls:"))
+        for tc in c.tool_calls:
+            fn = tc.get("function", {})
+            name = fn.get("name", "?")
+            args = fn.get("arguments", "")
+            print(f"  • {name}({args})")
+        print()
     print(R.rule())
 
 
@@ -168,10 +176,23 @@ def cmd_ask(args) -> int:
               f"resuming {R.paint(pid, 'accent')} · {len(history)} prior turns"))
 
     try:
+        images = list(getattr(args, "image", []) or [])
+        tools = None
+        tools_arg = getattr(args, "tools", None)
+        if tools_arg:
+            import json as _json
+            # accept a path or inline JSON
+            if os.path.exists(tools_arg):
+                with open(tools_arg, encoding="utf-8") as fh:
+                    tools = _json.load(fh)
+            else:
+                tools = _json.loads(tools_arg)
         result = P.complete(pid, prompt, model=args.model, system=args.system or "",
                             temperature=args.temperature, max_tokens=args.max_tokens,
                             timeout=args.timeout, history=history,
-                            stream=args.stream)
+                            stream=args.stream, images=images or None,
+                            tools=tools,
+                            tool_choice=getattr(args, "tool_choice", None))
     except (RuntimeError, ValueError) as e:
         print(R.status("err", str(e)))
         return 1
@@ -663,6 +684,16 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--raw", action="store_true", help="plain text, no chrome")
     sp.add_argument("--json", action="store_true",
                     help="emit the Completion as JSON (for scripting)")
+    sp.add_argument("--image", action="append", default=[],
+                    help="image ref for vision: http(s) URL, data: URI, or local "
+                         "path. Repeatable. (openai/anthropic transports)")
+    sp.add_argument("--tools", default=None,
+                    help="function-calling tool schemas: inline JSON or a path to "
+                         "a JSON file (list of OpenAI-style tool defs). "
+                         "(openai/anthropic transports)")
+    sp.add_argument("--tool-choice", default=None,
+                    help="tool selector: 'auto' (default), 'none', or "
+                         "{\"type\":\"function\",\"function\":{\"name\":\"...\"}}")
     sp.set_defaults(func=cmd_ask)
 
     sp = sub.add_parser("shell", help="interactive multi-turn REPL")

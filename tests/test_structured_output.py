@@ -28,7 +28,7 @@ def test_completion_to_dict_and_roundtrip():
     d = c.to_dict()
     assert d == {"provider": "groq", "model": "m", "text": "x",
                  "prompt_tokens": 1, "completion_tokens": 2,
-                 "total_tokens": 3, "latency_ms": 9}
+                 "total_tokens": 3, "latency_ms": 9, "tool_calls": []}
     back = Completion.from_dict(d)
     assert back.text == "x" and back.total_tokens == 3
 

@@ -157,7 +157,7 @@ def test_anthropic_uses_x_api_key(monkeypatch):
     def fake_post(url, body, headers, timeout):
         seen["url"] = url
         seen["headers"] = headers
-        return {"content": [{"text": "ok"}]}
+        return {"content": [{"type": "text", "text": "ok"}]}
 
     monkeypatch.setattr(P, "_post_json", fake_post)
     c = P.complete("anthropic", "hi")
