@@ -442,16 +442,18 @@ def cmd_packs(_args):
 
 def cmd_matrix(args):
     """Build an N x M answer matrix from documents + questions (IDEA α)."""
-    import os, json, glob
+    import json
     from idun.matrix import build_matrix
     from idun.ingest import load_documents
     docs = load_documents(args.docs)
     if not docs:
-        UI.info("No .txt/.md/.pdf documents found in " + args.docs); return 1
+        UI.info("No .txt/.md/.pdf documents found in " + args.docs)
+        return 1
     questions = [q.strip() for q in open(args.questions, encoding="utf-8") if q.strip()]
     if not questions:
-        UI.info("No questions found in " + args.questions); return 1
-    client = _client_from_args(args)
+        UI.info("No questions found in " + args.questions)
+        return 1
+    client = _client(args.backend)
     matrix = build_matrix(client, docs, questions)
     print(json.dumps(matrix, indent=2, ensure_ascii=False))
     return 0
