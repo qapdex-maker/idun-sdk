@@ -43,6 +43,8 @@ def test_cache_expiry(monkeypatch, tmp_path):
 
 def test_cache_hit_short_circuits_transport(monkeypatch, tmp_path):
     monkeypatch.setattr(P, "CACHE_DIR", str(tmp_path / "cache"))
+    # hermetic: don't depend on a real OPENAI_API_KEY in the env
+    monkeypatch.setattr(P, "resolve_credential", lambda p: "fake-token")
     calls = {"n": 0}
 
     def fake_openai(p, prompt, model, token, **kw):
@@ -62,6 +64,8 @@ def test_cache_hit_short_circuits_transport(monkeypatch, tmp_path):
 
 def test_no_cache_bypasses_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(P, "CACHE_DIR", str(tmp_path / "cache"))
+    # hermetic: don't depend on a real OPENAI_API_KEY in the env
+    monkeypatch.setattr(P, "resolve_credential", lambda p: "fake-token")
     calls = {"n": 0}
 
     def fake_openai(p, prompt, model, token, **kw):

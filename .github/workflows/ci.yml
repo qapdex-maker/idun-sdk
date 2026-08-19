@@ -48,6 +48,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install ruff
-        run: pip install ruff
+        run: pip install "ruff==0.15.10"
       - name: Lint
         run: ruff check idun/ idun_cli.py idun_mcp.py idun_multi.py tests/

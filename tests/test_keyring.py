@@ -100,8 +100,9 @@ def test_resolve_prefers_file_over_keyring(monkeypatch, tmp_path):
         os.remove(p.token_file)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    fake.set_password(kr.SERVICE_NAME, "groq", "sk-from-keyring")
+    fake.set_password(kr.SERVICE_NAME, "groq", "«redacted:sk-…»")
     # write a token file (0600) — this should take precedence
+    os.makedirs(os.path.dirname(p.token_file), exist_ok=True)
     with open(p.token_file, "w", encoding="utf-8") as fh:
         fh.write("sk-from-file")
     os.chmod(p.token_file, 0o600)
