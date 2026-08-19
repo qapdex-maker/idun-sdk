@@ -13,7 +13,7 @@ Runs headless on Termux/Android with nothing but the Python standard library
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 (reasoning + tool calls) instead of a black-box answer.
 
-## What's in the box (v1.0.7)
+## What's in the box (v1.0.14)
 
 - **`idun welcome`** — a pure-ASCII banner (no external `cmatrix` dependency;
   the shell is always left usable via a hard terminal reset).
@@ -123,8 +123,30 @@ export IDUN_TENANT=<your-tenant-guid>   # optional, default "organizations"
 idun login                              # Entra device-code
 ```
 
-Persist them in `~/.idunrc` (mode 0600, outside the repo) and
-`source ~/.idunrc`. Every other provider works with no Azure config at all.
+Persist them in `~/.idun/config.toml` (copy `config.example.toml` and fill
+in your own values — **no tenant is bundled, every user brings their own
+Foundry resource**):
+
+```bash
+cp config.example.toml ~/.idun/config.toml   # then edit idun_base / idun_project / idun_agent
+```
+
+Every other provider works with no Azure config at all.
+
+### Demo mode — no account needed
+
+The playground and CLI run **without any Foundry account**. If no token and
+no resource are configured, the router / CLI fall back to **recorded demo
+traces** (real agent trajectories, served offline) instead of erroring out.
+This keeps the tool open to everyone — you only need your own Azure AI
+Foundry resource when you want live calls:
+
+```bash
+# No IDUN_BASE / no token -> demo replay automatically
+cd idun-playground && python3 run_router.py   # opens :9001, serves demo traces
+```
+
+To switch from demo to live, set your resource (above) and run `idun login`.
 
 Python API:
 

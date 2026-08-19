@@ -4,6 +4,25 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.15] — 2026-08-19
+
+### Changed
+- **Tenant-agnostic by default.** `idun/client.py` now resolves Foundry
+  coordinates as env `IDUN_BASE/PROJECT/AGENT` > `~/.idun/config.toml`
+  `[defaults] idun_base/idun_project/idun_agent` > empty. No tenant is bundled;
+  every user supplies their own Azure AI Foundry resource.
+- **Shipped `config.example.toml`** (neutral, placeholder-only) so the package
+  is usable without any QMFI/tenant values: `cp config.example.toml
+  ~/.idun/config.toml` then fill in your own resource.
+- **Honest demo mode (no account needed).** The playground router and CLI fall
+  back to recorded demo traces (real agent trajectories, served offline) when no
+  token/resource is configured, instead of hard-crashing on "not configured".
+  This keeps the tool open to non-tenant users.
+- **README** updated: own resource required, demo mode documented, version
+  bumped to 1.0.15.
+- **MCP `serverInfo` version** now derives from `idun.__version__` (no literal),
+  so it tracks automatically (was hard-coded `0.1.33`).
+
 ## [1.0.14] — 2026-08-17
 
 ### Changed

@@ -17,7 +17,7 @@ __all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_ref
            "providers", "retro", "keyring_store", "Provider", "Completion", "complete",
            "get_provider", "list_providers", "support_matrix", "support_matrix_text",
            "estimate_cost", "cost_table"]
-__version__ = "1.0.14"
+__version__ = "1.0.15"
 
 
 def logo_path(variant: str = "white") -> str:
