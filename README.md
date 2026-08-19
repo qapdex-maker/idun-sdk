@@ -5,16 +5,8 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A thin, dependency-free Python client + CLI for **Azure AI Foundry** agents
-(Idun / NatureLM). Tenant-agnostic by default: bring your own Foundry resource,
-no hardcoded tenant coordinates.
-
-- **Tenant-agnostic** — configure your own resource via `~/.idun/config.toml`
-  or env vars; the SDK ships neutral defaults, never QMFI-specific values.
-- **Stdlib-only core** — `urllib`, no `httpx`/`aiohttp` required.
-- **Async + sync** — `IdunClient.complete()` and `AsyncIdunClient.acomplete()`.
-- **Doc × Question Matrix** (IDEA α) — answer a whole document set at once.
-- **Live demo, no account** — recorded trajectories at
-  <https://qapdex-maker.github.io/idun-playground/>.
+(Idun / NatureLM) and any OpenAI-compatible endpoint. Tenant-agnostic by default:
+bring your own Foundry resource, no hardcoded tenant coordinates.
 
 ---
 
@@ -26,7 +18,7 @@ pip install idun-sdk
 pip install "idun-sdk[pdf]"   # pulls PyPDF2
 ```
 
-## Quick start
+## Quick start (SDK)
 
 ```python
 from idun import IdunClient
@@ -53,72 +45,33 @@ asyncio.run(main())
 ## CLI
 
 ```text
-idun chat "your prompt"            # one-shot completion
-idun chat --async "your prompt"   # async path
-idun packs                        # list bundled prompt packs
-idun run <pack> <key>             # run a bundled prompt
-idun welcome                      # ASCII banner
-idun wizard                       # interactive setup (always exit-able: 1-5, s, q)
-idun matrix --docs DIR --questions FILE   # Doc x Question pivot (IDEA α)
+idun chat "your prompt"                    # one-shot completion
+idun chat --async "your prompt"           # async path
+idun run <pack> <key>                     # run a bundled prompt pack
+idun packs                                # list bundled prompt packs
+idun login                               # device-code login to your Foundry
+idun status                              # show token / config state
+idun wizard                              # interactive setup (1-5, s skip, q quit)
+idun welcome                             # ASCII banner
+idun export <file>                       # export conversation / config
+idun matrix  --docs DIR  --questions FILE   # Doc x Question pivot (IDEA α)
 idun diff-docs --doc-a A --doc-b B --topics T  # clause-drift compare (IDEA γ)
 ```
 
-### `idun matrix` — Idun Matrix (IDEA α)
+## Supported providers
 
-Build an **N × M answer matrix** over documents × questions. Each cell carries
-the answer, the source citation, and a status (GREEN = answered+cited,
-RED = contradiction, GRAY = no info).
+The `idun` CLI / `IdunClient` speak to any OpenAI-compatible endpoint plus the
+native Azure AI Foundry transport. Registered providers (over 3 transports):
 
-```bash
-# 1. Put your documents in a folder (.txt / .md / .pdf)
-# 2. One question per line in questions.txt
-idun matrix --docs ./contracts --questions ./questions.txt
-```
+- **OpenAI-compatible:** `openai`, `groq`, `together`, `perplexity`, `fireworks`,
+  `novita`, `xai`, `deepseek`, `mistral`, `openrouter`
+- **Anthropic:** `anthropic` (Claude)
+- **Google:** `gemini`
+- **Azure:** `azure` (Azure AI Foundry / Idun agent)
 
-Output (JSON):
-
-```json
-{
-  "What is the recyclate quota?": {
-    "contract_a.txt": {"answer": "30% of packaging is recyclate.", "citation": "Section 4.2", "status": "GREEN"},
-    "contract_b.txt": {"answer": "", "citation": "", "status": "GRAY"}
-  }
-}
-```
-
-Programmatic:
-
-```python
-from idun.matrix import build_matrix
-from idun import IdunClient
-
-client = IdunClient()
-docs = {"a.txt": "...", "b.md": "..."}
-questions = ["What is the recyclate quota?", "Is takeback offered?"]
-matrix = build_matrix(client, docs, questions)
-# matrix[question][doc] -> {answer, citation, status}
-```
-
-
-### `idun diff-docs` — Clause Drift (IDEA γ)
-
-Compare two documents across a set of topics and flag deviations:
-
-```bash
-idun diff-docs --doc-a contract_a.txt --doc-b contract_b.txt --topics topics.txt
-```
-
-Each topic gets a verdict: `GREEN` (agree), `RED` (contradiction), `GRAY`
-(one-sided). Programmatic:
-
-```python
-from idun.matrix import build_drift
-res = build_drift(client, doc_a_text, doc_b_text, ["recyclate quota", "takeback"])
-# res[topic] -> {verdict, detail}
-```
-
-Retrieval is chunked + BM25-lite (`idun.retrieve`), document ingest handles
-`.txt`/`.md` natively and `.pdf` via the optional extra (`idun.ingest`).
+Any OpenAI-compatible base URL works with zero code changes — set it in the
+config and the provider switches automatically. See
+**[SUPPORT_MATRIX.md](./SUPPORT_MATRIX.md)** for per-provider capability details.
 
 ## Configuration (tenant-agnostic)
 
@@ -134,19 +87,45 @@ token    = "YOUR_TOKEN"   # or use device-code login: `idun login`
 
 No QMFI-specific values are baked into the shipped code.
 
-## Demo (no account needed)
+## Additional features
 
-- Recorded agent trajectories + the Doc × Question matrix UI:
-  <https://qapdex-maker.github.io/idun-playground/>
-- Matrix concept note (IDEA α/β):
-  <https://github.com/qapdex-maker/idun-playground/blob/main/DOC_MATRIX_CONCEPT.md>
+> These build on the core SDK and live in `idun.matrix` / the playground repo.
+
+### Idun Matrix — Doc × Question pivot (IDEA α)
+
+Build an N × M answer matrix over documents × questions. Each cell carries the
+answer, the source citation, and a status (GREEN = answered+cited, RED =
+contradiction, GRAY = no info).
+
+```bash
+idun matrix --docs ./contracts --questions ./questions.txt
+```
+
+### Clause Drift compare (IDEA γ)
+
+Compare two documents across topics and flag deviations:
+
+```bash
+idun diff-docs --doc-a contract_a.txt --doc-b contract_b.txt --topics topics.txt
+```
+
+### PocketPal-style Bridge (IDEA β)
+
+A tenant-agnostic mobile web UI that runs `idun matrix` against *your* Foundry
+resource: <https://qapdex-maker.github.io/idun-playground/matrix_app.html>
+
+## Links
+
+- Live demo (recorded trajectories + matrix UI): <https://qapdex-maker.github.io/idun-playground/>
+- Matrix concept note: <https://github.com/qapdex-maker/idun-playground/blob/main/DOC_MATRIX_CONCEPT.md>
+- Source: <https://github.com/qapdex-maker/idun-sdk>
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # offline; no network/API keys required
-ruff check .           # lint (pinned ruff==0.15.10 in CI)
+pytest        # offline; no network/API keys required
+ruff check .  # lint (pinned ruff==0.15.10 in CI)
 ```
 
 ## License

@@ -4,6 +4,13 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.22] — 2026-08-19
+
+### Docs only (no code change)
+- README restructured SDK-first: provider list restored, CLI commands up top,
+  Matrix/Drift/Bridge features moved to bottom, demo links added at the end.
+- PyPI long_description refreshed.
+
 ## [1.0.21] — 2026-08-19
 
 ### New: Clause Drift compare (IDEA γ)
