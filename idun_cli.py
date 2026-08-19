@@ -444,12 +444,10 @@ def cmd_matrix(args):
     """Build an N x M answer matrix from documents + questions (IDEA α)."""
     import os, json, glob
     from idun.matrix import build_matrix
-    docs = {}
-    for path in glob.glob(os.path.join(args.docs, "*")):
-        if os.path.isfile(path) and path.endswith((".txt", ".md")):
-            docs[os.path.basename(path)] = open(path, encoding="utf-8").read()
+    from idun.ingest import load_documents
+    docs = load_documents(args.docs)
     if not docs:
-        UI.info("No .txt/.md documents found in " + args.docs); return 1
+        UI.info("No .txt/.md/.pdf documents found in " + args.docs); return 1
     questions = [q.strip() for q in open(args.questions, encoding="utf-8") if q.strip()]
     if not questions:
         UI.info("No questions found in " + args.questions); return 1

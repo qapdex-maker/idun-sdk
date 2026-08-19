@@ -4,6 +4,14 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.19] — 2026-08-19
+
+### Enhancement: PDF + flexible document ingest (IDEA α/β)
+- `idun/ingest.py`: `extract_text()` + `load_documents()` — handles .txt/.md natively,
+  .pdf via optional `PyPDF2`/`pdfminer.six` (graceful error if absent).
+- `idun matrix --docs DIR` now accepts .txt/.md/.pdf and skips unsupported types.
+- Tenant-agnostic, no hard dependencies added.
+
 ## [1.0.18] — 2026-08-19
 
 ### New: Idun Matrix (IDEA α) — Doc × Question pivot
