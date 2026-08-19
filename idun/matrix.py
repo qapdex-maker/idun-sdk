@@ -83,3 +83,64 @@ async def build_matrix_async(client, documents, questions, top_k=3):
                 continue
             matrix[q][name] = _parse(out.get("text") if isinstance(out, dict) else str(out))
     return matrix
+
+DRIFT_PROMPT = (
+    "You compare two documents (A and B) on the SAME topic. For the topic below, "
+    "state whether A and B AGREE, CONTRADICT, or whether the info is PRESENT in only "
+    "one of them.\n"
+    "Rules:\n"
+    "1. If both say the same -> reply: AGREE: <short summary>.\n"
+    "2. If they conflict -> reply: CONTRADICTION: <what A says> vs <what B says>.\n"
+    "3. If only one mentions it -> reply: ONE-SIDED: <which doc> says <what>.\n"
+    "4. Never use outside knowledge.\n\n"
+    "TOPIC: {topic}\n\n"
+    "DOCUMENT A:\n{a}\n\nDOCUMENT B:\n{b}\n\nVERDICT:"
+)
+
+
+def _parse_drift(text):
+    t = (text or "").strip()
+    up = t.upper()
+    if up.startswith("AGREE"):
+        return {"verdict": "GREEN", "detail": t}
+    if up.startswith("CONTRADICTION"):
+        return {"verdict": "RED", "detail": t}
+    if up.startswith("ONE-SIDED"):
+        return {"verdict": "GRAY", "detail": t}
+    return {"verdict": "GRAY", "detail": t}
+
+
+def build_drift(client, doc_a_text, doc_b_text, topics):
+    """Compare two documents across a list of topics (IDEA γ: clause drift).
+
+    Returns {topic: {verdict, detail}} where verdict is
+    GREEN (agree) / RED (contradiction) / GRAY (one-sided).
+    """
+    out = {}
+    for topic in topics:
+        ctx_a = "\n---\n".join(c for _, c in retrieve(topic, {"A": doc_a_text}, top_k=2))
+        ctx_b = "\n---\n".join(c for _, c in retrieve(topic, {"B": doc_b_text}, top_k=2))
+        prompt = DRIFT_PROMPT.format(topic=topic, a=ctx_a, b=ctx_b)
+        try:
+            resp = client.complete(prompt, max_output_tokens=400)
+        except Exception as e:
+            out[topic] = {"verdict": "GRAY", "detail": f"ERROR: {e}"}
+            continue
+        out[topic] = _parse_drift(resp.get("text") if isinstance(resp, dict) else str(resp))
+    return out
+
+
+async def build_drift_async(client, doc_a_text, doc_b_text, topics):
+    """Async variant of build_drift."""
+    out = {}
+    for topic in topics:
+        ctx_a = "\n---\n".join(c for _, c in retrieve(topic, {"A": doc_a_text}, top_k=2))
+        ctx_b = "\n---\n".join(c for _, c in retrieve(topic, {"B": doc_b_text}, top_k=2))
+        prompt = DRIFT_PROMPT.format(topic=topic, a=ctx_a, b=ctx_b)
+        try:
+            resp = await client.acomplete(prompt, max_output_tokens=400)
+        except Exception as e:
+            out[topic] = {"verdict": "GRAY", "detail": f"ERROR: {e}"}
+            continue
+        out[topic] = _parse_drift(resp.get("text") if isinstance(resp, dict) else str(resp))
+    return out

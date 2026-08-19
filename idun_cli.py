@@ -459,6 +459,27 @@ def cmd_matrix(args):
     return 0
 
 
+def cmd_diff_docs(args):
+    """Compare two documents across topics (IDEA γ: clause drift)."""
+    import json
+    from idun.matrix import build_drift
+    from idun.ingest import extract_text
+    try:
+        a = extract_text(args.doc_a)
+        b = extract_text(args.doc_b)
+    except (ValueError, RuntimeError) as e:
+        UI.info(str(e))
+        return 1
+    topics = [t.strip() for t in open(args.topics, encoding="utf-8") if t.strip()]
+    if not topics:
+        UI.info("No topics found in " + args.topics)
+        return 1
+    client = _client(args.backend)
+    result = build_drift(client, a, b, topics)
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_run(args):
     from idun import get_prompt, run_pack
     if args.all:
@@ -578,6 +599,13 @@ def build_parser() -> argparse.ArgumentParser:
     pm.add_argument("--docs", required=True, help="directory of .txt/.md documents")
     pm.add_argument("--questions", required=True, help="file with one question per line")
     pm.set_defaults(func=cmd_matrix)
+
+    pd = sub.add_parser(
+        "diff-docs", help="compare two documents across topics (IDEA γ: clause drift)")
+    pd.add_argument("--doc-a", required=True, help="first document (.txt/.md/.pdf)")
+    pd.add_argument("--doc-b", required=True, help="second document (.txt/.md/.pdf)")
+    pd.add_argument("--topics", required=True, help="file with one topic per line")
+    pd.set_defaults(func=cmd_diff_docs)
 
     pk = sub.add_parser(
         "packs",

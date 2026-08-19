@@ -4,6 +4,14 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.21] — 2026-08-19
+
+### New: Clause Drift compare (IDEA γ)
+- `idun.matrix.build_drift()` / `build_drift_async()` — compare two documents
+  across topics, verdict GREEN (agree) / RED (contradiction) / GRAY (one-sided).
+- `idun diff-docs --doc-a A --doc-b B --topics T` CLI command.
+- Offline test in `tests/test_matrix.py`.
+
 ## [1.0.20] — 2026-08-19
 
 ### Docs only (no code change)

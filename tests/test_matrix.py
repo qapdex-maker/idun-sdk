@@ -4,7 +4,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from idun.retrieve import chunk_text, rank_chunks, retrieve
-from idun.matrix import _parse, build_matrix
+from idun.matrix import _parse, build_matrix, build_drift
 
 
 def test_chunk_text_overlap():
@@ -68,3 +68,23 @@ def test_build_matrix_offline():
     cell_b = matrix[questions[0]]["contract_b.txt"]
     assert cell_a["status"] == "GREEN"
     assert cell_b["status"] == "GRAY"
+
+
+class _FakeDriftClient:
+    def __init__(self, responder):
+        self._r = responder
+    def complete(self, prompt, max_output_tokens=400):
+        return {"text": self._r(prompt)}
+
+def test_build_drift_offline():
+    a = "recyclate quota 30 percent packaging. Takeback at 1200 points."
+    b = "recyclate target 45 percent by 2030. No takeback mentioned."
+    topics = ["recyclate quota", "takeback service"]
+    def responder(prompt):
+        # build_drift injects "TOPIC: <topic>" into the prompt
+        if "TOPIC: takeback" in prompt:
+            return "ONE-SIDED: B says no takeback; A has 1200 points"
+        return "CONTRADICTION: A says 30%, B says 45%"
+    res = build_drift(_FakeDriftClient(responder), a, b, topics)
+    assert res["recyclate quota"]["verdict"] == "RED"
+    assert res["takeback service"]["verdict"] == "GRAY"

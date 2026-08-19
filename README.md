@@ -60,6 +60,7 @@ idun run <pack> <key>             # run a bundled prompt
 idun welcome                      # ASCII banner
 idun wizard                       # interactive setup (always exit-able: 1-5, s, q)
 idun matrix --docs DIR --questions FILE   # Doc x Question pivot (IDEA α)
+idun diff-docs --doc-a A --doc-b B --topics T  # clause-drift compare (IDEA γ)
 ```
 
 ### `idun matrix` — Idun Matrix (IDEA α)
@@ -96,6 +97,24 @@ docs = {"a.txt": "...", "b.md": "..."}
 questions = ["What is the recyclate quota?", "Is takeback offered?"]
 matrix = build_matrix(client, docs, questions)
 # matrix[question][doc] -> {answer, citation, status}
+```
+
+
+### `idun diff-docs` — Clause Drift (IDEA γ)
+
+Compare two documents across a set of topics and flag deviations:
+
+```bash
+idun diff-docs --doc-a contract_a.txt --doc-b contract_b.txt --topics topics.txt
+```
+
+Each topic gets a verdict: `GREEN` (agree), `RED` (contradiction), `GRAY`
+(one-sided). Programmatic:
+
+```python
+from idun.matrix import build_drift
+res = build_drift(client, doc_a_text, doc_b_text, ["recyclate quota", "takeback"])
+# res[topic] -> {verdict, detail}
 ```
 
 Retrieval is chunked + BM25-lite (`idun.retrieve`), document ingest handles
