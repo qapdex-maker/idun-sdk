@@ -4,6 +4,12 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.20] — 2026-08-19
+
+### Docs only (no code change)
+- README rewrite: version 1.0.20, Idun Matrix (IDEA α) section, tenant-agnostic
+  config, live-demo links. PyPI long_description refreshed.
+
 ## [1.0.19] — 2026-08-19
 
 ### Enhancement: PDF + flexible document ingest (IDEA α/β)
