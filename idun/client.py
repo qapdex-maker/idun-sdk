@@ -43,18 +43,39 @@ FOUNDRY_TENANT_DEFAULT = "organizations"
 TOKEN_FILE = os.path.join(os.path.expanduser("~"), "foundry_token.txt")
 
 
+def _config_defaults() -> dict:
+    """Read [defaults] from ~/.idun/config.toml (tenant-agnostic, no hard-coded resource)."""
+    try:
+        from . import config as _cfg
+
+        cfg = _cfg.load_config()
+        return cfg.get("defaults", {}) or {}
+    except Exception:
+        return {}
+
+
 def foundry_base() -> str:
-    """Foundry resource base URL from IDUN_BASE (no tenant default)."""
-    return (os.environ.get("IDUN_BASE") or "").strip().rstrip("/")
+    """Foundry resource base URL: IDUN_BASE env > config.toml > empty (unset)."""
+    env = (os.environ.get("IDUN_BASE") or "").strip().rstrip("/")
+    if env:
+        return env
+    return (_config_defaults().get("idun_base") or "").strip().rstrip("/")
 
 
 def foundry_project() -> str:
-    """Foundry project name from IDUN_PROJECT (no tenant default)."""
-    return (os.environ.get("IDUN_PROJECT") or "").strip()
+    """Foundry project name: IDUN_PROJECT env > config.toml > empty (unset)."""
+    env = (os.environ.get("IDUN_PROJECT") or "").strip()
+    if env:
+        return env
+    return (_config_defaults().get("idun_project") or "").strip()
 
 
 def foundry_agent() -> str:
-    return (os.environ.get("IDUN_AGENT") or FOUNDRY_AGENT_DEFAULT).strip()
+    """Foundry agent name: IDUN_AGENT env > config.toml > default."""
+    env = (os.environ.get("IDUN_AGENT") or "").strip()
+    if env:
+        return env
+    return (_config_defaults().get("idun_agent") or FOUNDRY_AGENT_DEFAULT).strip()
 
 
 def foundry_tenant() -> str:

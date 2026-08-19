@@ -23,6 +23,7 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from idun.client import IdunClient
 from idun import providers as P
+from idun import __version__ as IDUN_VERSION
 
 
 TOOLS = [
@@ -296,7 +297,7 @@ def _dispatch(req):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "idun-mcp", "version": "0.1.33"},
+                "serverInfo": {"name": "idun-mcp", "version": IDUN_VERSION},
             },
         }
     if method == "notifications/initialized":

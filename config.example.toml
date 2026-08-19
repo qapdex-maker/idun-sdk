@@ -1,0 +1,28 @@
+# Idun SDK — example configuration (tenant-agnostic).
+#
+# Copy this to ~/.idun/config.toml and fill in YOUR OWN Azure AI Foundry
+# resource. The Idun SDK / connector never bundle a tenant — you bring your
+# own Foundry resource, project, and agent.
+#
+#   cp config.example.toml ~/.idun/config.toml
+#
+# Environment variables (IDUN_BASE / IDUN_PROJECT / IDUN_AGENT / IDUN_TENANT)
+# always win over this file. Leave the Foundry fields blank to run the
+# playground / CLI in demo mode (recorded traces, no live calls).
+
+[defaults]
+provider = "azure"
+theme = "gameboy"
+
+# --- Your Azure AI Foundry resource (replace with your own) ---
+# idun_base    = "https://<your-resource>.services.ai.azure.com"
+# idun_project = "<your-project>"
+# idun_agent   = "NatureLM-Idun-5-MoE"   # optional; default is shown
+
+# --- Optional: other completion backends (not Foundry) ---
+# [groq]
+# model = "llama-3.3-70b-versatile"
+#
+# [openai]
+# base = "https://api.openai.com/v1"
+# model = "gpt-4o-mini"
