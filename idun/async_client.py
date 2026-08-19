@@ -33,6 +33,13 @@ from .providers import (
 )
 
 
+def _run_sync(fn, *args, **kwargs):
+    """Run a blocking stdlib call in a worker thread (3.8-compatible
+    equivalent of ``asyncio.to_thread``, which is 3.9+ only)."""
+    loop = asyncio.get_event_loop()
+    return loop.run_in_executor(None, lambda: fn(*args, **kwargs))
+
+
 class AsyncIdunClient:
     """Async counterpart to the synchronous registry calls.
 
@@ -42,12 +49,12 @@ class AsyncIdunClient:
 
     async def acomplete(self, pid: str, prompt: str, **kwargs) -> Completion:
         """Async version of :func:`idun.providers.complete` (non-streaming)."""
-        return await asyncio.to_thread(_P.complete, pid, prompt, **kwargs)
+        return await _run_sync(_P.complete, pid, prompt, **kwargs)
 
     async def acomplete_chain(self, chain: list[str], prompt: str,
-                              **kwargs) -> Completion:
+                             **kwargs) -> Completion:
         """Async version of :func:`idun.providers.complete_chain`."""
-        return await asyncio.to_thread(_P.complete_chain, chain, prompt, **kwargs)
+        return await _run_sync(_P.complete_chain, chain, prompt, **kwargs)
 
     @staticmethod
     async def gather(*jobs) -> list:
