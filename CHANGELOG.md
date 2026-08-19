@@ -4,7 +4,18 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
-## [1.0.15] — 2026-08-19
+## [1.0.16] — 2026-08-19
+
+### Fixed
+- **`idun chat --async` no longer crashes.** The CLI called a
+  non-existent `IdunClient.complete_async`; it now uses
+  `AsyncIdunClient.acomplete` (3.8-compatible via `run_in_executor`).
+
+### Docs
+- README: Prompt packs (`list_packs`/`get_prompt`), Async client, and
+  automatic token rotation (`load_token` → refresh grant 5 min before expiry).
+
+
 
 ### Changed
 - **Tenant-agnostic by default.** `idun/client.py` now resolves Foundry
