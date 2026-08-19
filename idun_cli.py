@@ -62,10 +62,16 @@ def _client(backend: str | None = None) -> IdunClient:
 
 def _run(args, prompt) -> IdunResult:
     """Sync or async completion based on args.async flag (default sync)."""
-    c = _client(getattr(args, "backend", None))
+    backend = getattr(args, "backend", None)
     if getattr(args, "async_", False):
         import asyncio
-        return asyncio.run(c.complete_async(prompt, max_output_tokens=args.max_tokens))
+        from idun.async_client import AsyncIdunClient
+        from idun.providers import default_provider
+        pid = backend or default_provider()
+        return asyncio.run(
+            AsyncIdunClient().acomplete(
+                pid, prompt, max_output_tokens=args.max_tokens))
+    c = _client(backend)
     return c.complete(prompt, max_output_tokens=args.max_tokens)
 
 

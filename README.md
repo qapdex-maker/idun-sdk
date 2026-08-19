@@ -161,6 +161,53 @@ Credentials resolve from the provider env keys first, then
 `~/.idun/<id>.token` (file 0600, dir 0700). Keys are never echoed and never
 passed via argv.
 
+### Prompt packs
+
+Curated demo prompts ship as JSON in `idun/data/prompt_packs/` and are
+resolvable programmatically — handy for showcases and tests:
+
+```python
+from idun import list_packs, get_prompt
+
+for pack in list_packs():
+    print(pack["name"], pack["count"], "prompts")
+
+prompt = get_prompt("contoso", "sustainability_summary")
+```
+
+### Async (no extra deps)
+
+`AsyncIdunClient` mirrors the sync API but is `async` and runs the blocking
+stdlib transport in a worker thread (3.8-compatible, no `asyncio.to_thread`
+dependency):
+
+```python
+import asyncio
+from idun.async_client import AsyncIdunClient
+
+async def main():
+    c = AsyncIdunClient()
+    results = await c.gather(
+        c.acomplete("groq", "hi"),
+        c.acomplete("openai", "hi"),
+    )
+    for r in results:
+        print(r.text)
+
+asyncio.run(main())
+```
+
+The CLI exposes the same via `idun chat --async "..."`.
+
+### Token auto-rotation
+
+Azure AI Foundry access tokens are short-lived. `load_token()` silently
+rotates the stored token via the OAuth refresh grant ~5 minutes before expiry
+(`REFRESH_SLACK`) and falls back to a fresh device-code login when no refresh
+token is present. Every call that needs a token goes through `load_token()`, so
+you never have to manually re-login between short sessions. Inspect or force a
+rotation with `idun token --status` / `idun token --refresh`.
+
 ## Configuration file
 
 `~/.idun/config.toml` is the primary config source. Resolution order is
