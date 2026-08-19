@@ -146,6 +146,10 @@ Foundry resource when you want live calls:
 cd idun-playground && python3 run_router.py   # opens :9001, serves demo traces
 ```
 
+A hosted demo (static, no backend, no account) is live at
+**https://qapdex-maker.github.io/idun-playground/** — pick any recorded
+trace and watch the agent trajectory build up step by step.
+
 To switch from demo to live, set your resource (above) and run `idun login`.
 
 Python API:
