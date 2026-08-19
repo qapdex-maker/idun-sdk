@@ -4,6 +4,16 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.18] — 2026-08-19
+
+### New: Idun Matrix (IDEA α) — Doc × Question pivot
+- `idun/retrieve.py`: stdlib-only chunking + BM25-lite keyword retrieval.
+- `idun/matrix.py`: `build_matrix()` / `build_matrix_async()` → N×M cells
+  (answer + citation + GREEN/RED/GRAY status) over documents × questions.
+- `idun matrix --docs DIR --questions FILE` CLI command.
+- Offline tests in `tests/test_matrix.py` (retrieval + cell parsing + matrix build).
+- Tenant-agnostic, no new dependencies.
+
 ## [1.0.17] — 2026-08-19
 
 ### Docs / Housekeeping

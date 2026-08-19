@@ -440,6 +440,25 @@ def cmd_packs(_args):
             UI.info(f"    {pk['description']}")
 
 
+def cmd_matrix(args):
+    """Build an N x M answer matrix from documents + questions (IDEA α)."""
+    import os, json, glob
+    from idun.matrix import build_matrix
+    docs = {}
+    for path in glob.glob(os.path.join(args.docs, "*")):
+        if os.path.isfile(path) and path.endswith((".txt", ".md")):
+            docs[os.path.basename(path)] = open(path, encoding="utf-8").read()
+    if not docs:
+        UI.info("No .txt/.md documents found in " + args.docs); return 1
+    questions = [q.strip() for q in open(args.questions, encoding="utf-8") if q.strip()]
+    if not questions:
+        UI.info("No questions found in " + args.questions); return 1
+    client = _client_from_args(args)
+    matrix = build_matrix(client, docs, questions)
+    print(json.dumps(matrix, indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_run(args):
     from idun import get_prompt, run_pack
     if args.all:
@@ -553,6 +572,12 @@ def build_parser() -> argparse.ArgumentParser:
     pe.add_argument("--output", "-o", help="write to file instead of stdout")
     _add_common_args(pe)
     pe.set_defaults(func=cmd_export)
+
+    pm = sub.add_parser(
+        "matrix", help="build Doc x Question answer matrix (IDEA α)")
+    pm.add_argument("--docs", required=True, help="directory of .txt/.md documents")
+    pm.add_argument("--questions", required=True, help="file with one question per line")
+    pm.set_defaults(func=cmd_matrix)
 
     pk = sub.add_parser(
         "packs",
