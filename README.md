@@ -13,7 +13,7 @@ Runs headless on Termux/Android with nothing but the Python standard library
 calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 (reasoning + tool calls) instead of a black-box answer.
 
-## What's in the box (v1.0.14)
+## What's in the box (v1.0.17)
 
 - **`idun welcome`** — a pure-ASCII banner (no external `cmatrix` dependency;
   the shell is always left usable via a hard terminal reset).
@@ -35,7 +35,7 @@ calls tools like `web_search`); this SDK surfaces the **full agent trajectory**
 - **Verified install** — `test.sh` builds a fresh wheel, installs it into a
   temp dir, runs the offline suite, and asserts the console scripts resolve
   to this package.
-- **CI** — Python 3.8–3.14 matrix + a native Termux/aarch64 job + ruff lint.
+- **CI** — Python 3.8–3.14 matrix (ubuntu) + ruff lint (pinned `ruff==0.15.10`).
 
 ## Quick start
 

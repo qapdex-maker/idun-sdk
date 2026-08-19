@@ -4,6 +4,13 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.17] — 2026-08-19
+
+### Docs / Housekeeping
+- README: version badge updated to 1.0.17; CI description corrected
+  (Termux/aarch64 job removed, ruff pinned to `0.15.10`).
+- `pyproject.toml`: PEP 517 build-system (merged via PR #8).
+
 ## [1.0.16] — 2026-08-19
 
 ### Fixed

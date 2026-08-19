@@ -4,12 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idun-sdk"
-dynamic = ["version"]
+version = "1.0.17"
 description = "Stdlib-only client + CLI for the Azure AI Foundry agent NatureLM-Idun-5-MoE"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 dependencies = []
 
-[tool.setuptools.dynamic]
-version = { attr = "idun.__version__" }
