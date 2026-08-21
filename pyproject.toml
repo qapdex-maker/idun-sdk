@@ -17,6 +17,12 @@ dependencies = []
 [tool.setuptools.dynamic]
 version = { attr = "idun.__version__" }
 
+[project.urls]
+Source = "https://github.com/qapdex-maker/idun-sdk"
+Playground = "https://github.com/qapdex-maker/idun-playground"
+Docs = "https://gitmcp.io/qapdex-maker/idun-sdk/sse"
+Bug-Tracker = "https://github.com/qapdex-maker/idun-sdk/issues"
+
 # Console scripts MUST live here, not only in setup.py.
 #
 # PEP 621: once a [project] table exists, setuptools takes project metadata

@@ -4,6 +4,15 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.25] — 2026-08-21
+
+### Docs / metadata
+- Added `project.urls` to pyproject.toml so PyPI shows Project Links: Source,
+  Playground (idun-playground), Docs (GitMCP), Bug Tracker. (setup.py's
+  project_urls were ignored under PEP 621 once [project] existed in
+  pyproject.toml.)
+- No code changes.
+
 ## [1.0.24] — 2026-08-21
 
 ### Fixed: wizard separation (correction to 1.0.23)
