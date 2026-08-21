@@ -105,3 +105,25 @@ def test_cli_modules_do_not_duplicate_version():
         f"idun.__version__ ({idun.__version__!r}): {offenders}. Import the "
         "version instead."
     )
+
+
+def test_openapi_json_version_matches_package():
+    """The shipped OpenAPI spec (idun/openapi.json) must report the package version.
+
+    The spec is a published artifact (it is shipped inside the package), so a
+    stale version string there is visible to anyone who feeds it to an OpenAPI
+    tool. It had drifted to 0.1.38 while the package was already at 1.0.25.
+    Bind it to idun.__version__ so the next drift fails in CI instead of
+    shipping silently.
+    """
+    path = os.path.join(ROOT, "idun", "openapi.json")
+    if not os.path.exists(path):
+        pytest.skip("idun/openapi.json not present in this checkout")
+    import json
+    with open(path, encoding="utf-8") as fh:
+        spec = json.load(fh)
+    spec_version = spec["info"]["version"]
+    assert spec_version == idun.__version__, (
+        f"idun/openapi.json says version {spec_version!r}, package is "
+        f"{idun.__version__!r}. Keep the spec in sync with idun.__version__."
+    )
