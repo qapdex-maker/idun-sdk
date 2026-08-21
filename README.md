@@ -28,6 +28,34 @@ out = client.complete("Summarize the quarterly risk report.")
 print(out["text"])
 ```
 
+### Two CLIs — one setup
+
+This package ships **two** command-line tools with distinct purposes:
+
+- **`idun`** — the Azure AI Foundry client. Agent completions, trajectory
+  export, document matrix (`idun matrix`), prompt packs (`idun packs` /
+  `idun run`), and Hugging Face Hub operations (`idun hf`). Azure-specific.
+- **`idun-multi`** — the multi-provider LLM console. Talks to any of the 17
+  registered providers (OpenAI, Anthropic, Groq, OpenRouter, HF, …) plus
+  `race`, `cost`, `models`, `doctor`, `support`. Provider-agnostic.
+
+Both read the **same** `~/.idun/config.toml`. There is exactly **one** setup
+entry point — `idun-wizard` (also reachable as `idun wizard` and
+`idun-multi wizard`, both of which delegate to it). It writes only the default
+provider; credentials live in per-provider `~/.idun/<id>.token` files (0600).
+
+> Do not run two different setup wizards — there is now only one. The old
+> `idun-multi wizard` used to write `~/.idunrc`; that file is no longer used.
+
+```text
+idun-multi providers        # list providers + credential status
+idun-multi -p openrouter ask "hello"   # -p goes BEFORE the subcommand
+idun-multi race "explain quantum"      # compare providers on one prompt
+idun-multi doctor            # environment + credential audit (also checks scripts)
+idun-multi wizard            # -> idun-wizard (shared setup)
+idun wizard                  # -> idun-wizard (shared setup)
+```
+
 ### Async
 
 ```python
@@ -61,13 +89,33 @@ idun diff-docs --doc-a A --doc-b B --topics T  # clause-drift compare (IDEA γ)
 ## Supported providers
 
 The `idun` CLI / `IdunClient` speak to any OpenAI-compatible endpoint plus the
-native Azure AI Foundry transport. Registered providers (over 3 transports):
+native Azure AI Foundry transport. Registered providers (3 transports):
 
 - **OpenAI-compatible:** `openai`, `groq`, `together`, `perplexity`, `fireworks`,
-  `novita`, `xai`, `deepseek`, `mistral`, `openrouter`
+  `novita`, `xai`, `deepseek`, `mistral`, `openrouter`, `gemini`, `hf`
 - **Anthropic:** `anthropic` (Claude)
-- **Google:** `gemini`
 - **Azure:** `azure` (Azure AI Foundry / Idun agent)
+- **Local:** `ollama`, `local` (bring your own endpoint)
+
+> **Tested vs untested (as of 2026-08-21).** After a full audit only a subset
+> of these providers has actually been exercised against a live endpoint. The
+> rest are **registered and code-complete but NOT verified** — they may work,
+> but nobody has confirmed it.
+>
+> | Status | Providers |
+> |---|---|
+> | ✅ tested against a live endpoint | `openrouter` (live OK), `openai` (token valid, account has no credit → HTTP 429), `hf` (migrated to `router.huggingface.co`; see note), `ollama` / `local` (correctly unreachable in CI) |
+> | ⚠️ untested | `anthropic`, `groq`, `together`, `deepseek`, `mistral`, `gemini`, `xai`, `nous`, `perplexity`, `fireworks`, `novita` |
+> | ℹ️ needs tenant | `azure` |
+>
+> See **[AUDIT-BEFEHLE.md](./AUDIT-BEFEHLE.md)** for the full command audit and
+> **[BEFUNDE.md](./BEFUNDE.md)** / **[ROADMAP-FIX.md](./ROADMAP-FIX.md)** for the
+> bug log. A live test harness for `idun race` is planned to exercise all
+> providers before the next release.
+
+**Hugging Face (`hf`):** migrated to the OpenAI-compatible router
+`https://router.huggingface.co/v1` (the old `api-inference.huggingface.co` host
+was retired and no longer resolves). Requires an HF token (`HF_TOKEN`).
 
 Any OpenAI-compatible base URL works with zero code changes — set it in the
 config and the provider switches automatically. See
@@ -75,17 +123,20 @@ config and the provider switches automatically. See
 
 ## Configuration (tenant-agnostic)
 
-`~/.idun/config.toml` (neutral defaults — supply your own resource):
+`~/.idun/config.toml` (neutral defaults — supply your own resource). Secrets go
+to per-provider `~/.idun/<id>.token` files (mode 0600), **not** in this file:
 
 ```toml
-[default]
-endpoint = "https://YOUR-RESOURCE.services.ai.azure.com"
-project  = "your-project"
-agent    = "your-agent-name"
-token    = "YOUR_TOKEN"   # or use device-code login: `idun login`
+[defaults]
+provider = "openrouter"   # selected by `idun-wizard`
+
+[openrouter]
+model = "deepseek/deepseek-chat"
 ```
 
-No QMFI-specific values are baked into the shipped code.
+No tenant coordinates are baked into the shipped code. The CLI reads the config
+via `idun.config`; environment variables (`IDUN_PROVIDER`, `OPENAI_API_KEY`, …)
+always win over the file.
 
 ## Additional features
 

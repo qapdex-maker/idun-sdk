@@ -30,10 +30,18 @@ def test_every_provider_has_base_and_model():
         assert p.transport in ("openai", "anthropic", "hf", "azure"), p.id
 
 
-def test_get_provider_accepts_case_and_alias():
+def test_get_provider_is_case_insensitive():
     assert P.get_provider("OpenAI").id == "openai"
-    # legacy backend name maps onto the openai dialect
-    assert P.get_provider("github").id == "openai"
+    assert P.get_provider("  OPENROUTER  ").id == "openrouter"
+
+
+def test_get_provider_has_no_aliases():
+    """'github' used to map onto openai, mixing credentials. It must not.
+
+    See tests/test_no_provider_aliasing.py for the full rationale.
+    """
+    with pytest.raises(ValueError):
+        P.get_provider("github")
 
 
 def test_get_provider_rejects_unknown():

@@ -41,12 +41,14 @@ def test_matrix_known_shapes():
     assert rows["anthropic"]["tools"] is True
     assert rows["anthropic"]["vision"] is True
     assert rows["anthropic"]["json_mode"] is False
-    # hf: nothing
-    assert rows["hf"]["streaming"] is False
-    assert rows["hf"]["json_mode"] is False
+    # hf now rides the openai-compatible router, so it exposes the same
+    # capabilities as the other openai-transport providers. Assert the rule
+    # instead of a hard-coded "nothing" -- the old assertion froze hf into the
+    # pre-migration state (needs_key=False, transport="hf").
+    assert rows["hf"]["streaming"] is True
+    assert rows["hf"]["json_mode"] is True
+    assert rows["hf"]["tools"] is True
     assert rows["anthropic"]["json_mode"] is False
-    assert rows["hf"]["streaming"] is False
-    assert rows["hf"]["json_mode"] is False
 
 
 def test_matrix_text_is_markdown_table():

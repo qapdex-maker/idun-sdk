@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -258,14 +259,19 @@ REGISTRY: tuple[Provider, ...] = (
     Provider(
         id="hf",
         label="Hugging Face Inference",
-        base="https://api-inference.huggingface.co/models",
-        default_model="microsoft/phi-3-mini-4k-instruct",
+        # HuggingFace retired api-inference.huggingface.co (the host no longer
+        # resolves at all) and replaced it with the OpenAI-compatible router.
+        # Anonymous access is gone too: a token-less call returns HTTP 401,
+        # hence needs_key=True and the openai transport.
+        # See tests/test_hf_endpoint.py.
+        base="https://router.huggingface.co/v1",
+        default_model="deepseek-ai/DeepSeek-V4-Flash",
         env_keys=("HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"),
-        models=("microsoft/phi-3-mini-4k-instruct",),
+        models=("deepseek-ai/DeepSeek-V4-Flash",),
         free_tier=True,
-        needs_key=False,
-        notes="Anonymous access works but is rate-limited.",
-        transport="hf",
+        needs_key=True,
+        notes="OpenAI-compatible router; needs an HF token (HF_TOKEN).",
+        transport="openai",
     ),
     Provider(
         id="ollama",
@@ -332,13 +338,33 @@ def list_providers() -> tuple[Provider, ...]:
 
 
 def get_provider(pid: str) -> Provider:
+    """Look up a provider by id. Unknown ids raise ValueError.
+
+    There are deliberately **no aliases**. A previous version rewrote
+    ``github`` to ``openai``, which meant a GitHub PAT entered under the name
+    ``github`` was stored in ``~/.idun/openai.token`` and then sent to
+    ``api.openai.com`` — the wrong host for the credential, and OpenAI's own key
+    silently overwritten. ``github`` was also absent from REGISTRY, so it could
+    never be picked from the provider list while still resolving here: the
+    registry and the lookup disagreed about what existed.
+
+    GitHub Models is a separate service with its own endpoint and its own
+    credential type. If it is supported later it becomes a real REGISTRY entry
+    with its own ``token_file`` — never an alias onto another provider's secret
+    store. See tests/test_no_provider_aliasing.py.
+    """
     key = (pid or "").strip().lower()
-    # accept legacy alias
-    if key == "github":
-        key = "openai"
     if key not in _BY_ID:
-        raise ValueError(
-            f"unknown provider {pid!r}. Known: {', '.join(sorted(_BY_ID))}")
+        known = ", ".join(sorted(_BY_ID))
+        if key == "github":
+            raise ValueError(
+                "provider 'github' is not supported. GitHub Models is a "
+                "separate service (its own endpoint, a GitHub PAT as "
+                "credential) and was previously aliased onto 'openai', which "
+                "wrote the PAT into OpenAI's token file and sent it to "
+                f"api.openai.com. Use one of: {known}"
+            )
+        raise ValueError(f"unknown provider {pid!r}. Known: {known}")
     return _BY_ID[key]
 
 
@@ -385,11 +411,23 @@ def resolve_credential(p: Provider) -> str:
 def save_credential(p: Provider, token: str) -> str:
     """Persist a provider key to ~/.idun/<id>.token with 0600 perms.
 
-    The file is created atomically with mode 0o600 via os.open(O_CREAT|O_EXCL),
-    so there is never a window where the token sits on disk with the process
-    umask (typically 0644) before a separate chmod. A missing/permissive
-    ~/.idun is tightened to 0700; failure there is non-fatal because the file
-    itself is already owner-only.
+    The token is written to a temporary file in the same directory (created with
+    mode 0o600 via ``os.open(O_CREAT|O_EXCL)``, so the secret is never briefly
+    world-readable under the process umask) and then moved into place with
+    ``os.replace()``. That makes the save **atomic and idempotent**: a reader
+    either sees the old token or the new one, never a partial write, and saving
+    twice simply overwrites.
+
+    Overwriting matters: the previous implementation opened the *destination*
+    with ``O_EXCL`` and had no ``FileExistsError`` handler, so every save after
+    the first crashed and the stale token survived — a mistyped key could never
+    be corrected. See tests/test_credential_overwrite.py.
+
+    On failure the temporary file is removed and any previously stored token is
+    left untouched, so a failed correction never costs a working credential.
+
+    A missing/permissive ~/.idun is tightened to 0700; failure there is
+    non-fatal because the file itself is already owner-only.
 
     When the OS keyring backend is opted in, the same token is also mirrored to
     the keyring (best-effort; a keyring failure never fails the file write).
@@ -399,13 +437,40 @@ def save_credential(p: Provider, token: str) -> str:
         os.chmod(CONFIG_DIR, 0o700)
     except OSError:
         pass
-    fd = os.open(p.token_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+
+    payload = token.strip()
+    dest = p.token_file
+    tmp_path = None
     try:
+        # Unique temp file next to the destination (same filesystem, so
+        # os.replace() is atomic). O_EXCL is correct here: the name is fresh.
+        fd, tmp_path = tempfile.mkstemp(
+            prefix=f".{os.path.basename(dest)}.", dir=os.path.dirname(dest) or "."
+        )
+        try:
+            os.fchmod(fd, 0o600)
+        except (AttributeError, OSError):
+            # Platforms without fchmod: fall back to a path-based chmod.
+            try:
+                os.chmod(tmp_path, 0o600)
+            except OSError:
+                pass
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(token.strip())
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        # Atomically replace any existing token; this is what makes a repeat
+        # save work instead of raising FileExistsError.
+        os.replace(tmp_path, dest)
+        tmp_path = None
     except BaseException:
-        os.unlink(p.token_file)
+        if tmp_path is not None:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
         raise
+
     # optional mirror to the OS keyring (non-fatal)
     try:
         from .keyring_store import store_keyring
@@ -845,7 +910,7 @@ def _extract_text(transport: str, data: object) -> str:
                 return gen.get("content") or gen.get("text") or ""
             return str(gen or "")
         return str(data or "")
-    # openai dialect
+    # openai dialect (also used by the hf router since the migration)
     if isinstance(data, dict):
         try:
             return data["choices"][0]["message"]["content"] or ""

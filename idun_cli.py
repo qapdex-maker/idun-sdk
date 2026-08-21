@@ -5,7 +5,7 @@ Usage:
   idun wizard                 # universal first-run setup (any user, any backend)
   idun login  --backend hf    # store backend credentials
   idun status                 # show active backend + credential state
-  idun chat  --backend github "your prompt"   # print final answer
+  idun chat  --backend openai "your prompt"   # print final answer
   idun chat                              # live interactive session (REPL)
   idun trace "your prompt"    # print agent trajectory (azure only, with steps)
   idun token [--status|--refresh|-f]   # inspect / rotate the stored Azure token
@@ -28,15 +28,22 @@ from idun import _cli_retro as UI
 
 
 def _save_backend_token(backend: str, token: str) -> str:
-    """Persist a non-azure backend key via the provider registry (~/.idun/<id>.token)."""
-    pid = "openai" if backend == "github" else backend
-    path = save_credential(get_provider(pid), token)
+    """Persist a non-azure backend key via the provider registry (~/.idun/<id>.token).
+
+    No name rewriting happens here: the backend name IS the provider id. The
+    former ``github`` -> ``openai`` mapping meant a GitHub PAT was written into
+    OpenAI's token file. Unknown names now raise from get_provider().
+    """
+    path = save_credential(get_provider(backend), token)
     return path
 
 
 
 def _add_backend_arg(p):
-    p.add_argument("--backend", choices=["azure", "hf", "github", "openai"],
+    # 'github' is intentionally absent: GitHub Models is a separate service and
+    # was previously aliased onto openai, mixing credentials. See
+    # tests/test_no_provider_aliasing.py.
+    p.add_argument("--backend", choices=["azure", "hf", "openai"],
                    default=None,
                    help="completion backend (default: $IDUN_BACKEND or azure)")
 
@@ -89,11 +96,17 @@ def cmd_login(args):
             UI.ok("saved -> ~/.idun/hf.token")
         return
     if backend == "github":
-        tok = input("GitHub PAT (ghp_... / github_pat_...): ").strip()
-        if tok:
-            _save_backend_token("openai", tok)
-            UI.ok("saved -> ~/.idun/openai.token")
-        return
+        # Previously this asked for a GitHub PAT and stored it in
+        # ~/.idun/openai.token, overwriting the OpenAI key and sending the PAT
+        # to api.openai.com. GitHub Models is a separate service and is not
+        # supported; refuse instead of corrupting another provider's secret.
+        sys.exit(
+            "backend 'github' is not supported.\n"
+            "GitHub Models is a separate service (own endpoint, GitHub PAT as\n"
+            "credential). It used to be aliased onto 'openai', which stored the\n"
+            "PAT in ~/.idun/openai.token and sent it to api.openai.com.\n"
+            "Use --backend openai with an OpenAI key instead."
+        )
     sys.exit(f"login not supported for backend {backend!r}")
 
 
@@ -173,9 +186,8 @@ def cmd_status(_args):
         meta = _load_meta()
         ok = bool(meta and meta.get("access_token"))
         lines.append(("azure token", "present" if ok else "MISSING (~/foundry_token.txt)"))
-    elif backend in ("hf", "github", "openai"):
-        pid = "openai" if backend == "github" else backend
-        p = get_provider(pid)
+    elif backend in ("hf", "openai"):
+        p = get_provider(backend)
         status = credential_status(p)
         lines.append((f"{backend} token", status))
         lines.append((f"{backend} model", os.environ.get(
@@ -242,160 +254,6 @@ def cmd_hf(args):
         return 0
     UI.err("unknown hf subcommand")
     return 1
-
-
-def cmd_wizard(_args):
-    """Universal first-run setup wizard.
-
-    Picks a backend (or any generic OpenAI-compatible endpoint), captures
-    credentials, lets the user choose a retro theme, writes everything to
-    ``~/.idun/config.toml`` + the per-provider ``.token`` file, and runs a
-    short test call. The backend step can be SKIPPED (keep registry defaults)
-    and the wizard can be QUIT at any prompt (type ``q`` or Ctrl-C / EOF) with
-    no changes and a clean shell.
-    """
-    # TTY safety: a piped / non-interactive invocation must never hang or crash.
-    if not sys.stdin.isatty():
-        UI.err(
-            "`idun wizard` needs an interactive TTY. Run it in a real terminal, "
-            "or set credentials via `idun login --backend X` / environment vars."
-        )
-        return 1
-
-    from idun import config as C
-    from idun.retro import list_themes
-
-    choices = [
-        "1) azure   — Azure AI Foundry (NatureLM-Idun). Needs an Azure tenant.",
-        "2) hf      — Hugging Face Inference API (free tier, needs HF token).",
-        "3) github  — GitHub Models (free tier, needs GitHub PAT).",
-        "4) openai  — OpenAI /v1/chat/completions (needs OPENAI_API_KEY).",
-        "5) other   — ANY OpenAI-compatible endpoint (URL + key, any vendor).",
-        "s) skip    — keep registry defaults, only pick a theme.",
-        "q) quit    — exit without changing anything.",
-    ]
-    UI.wizard_intro(choices)
-
-    def _read(prompt: str) -> str:
-        """Read one line; 'q' / Ctrl-C / EOF aborts the wizard cleanly."""
-        try:
-            return input(prompt).strip()
-        except (EOFError, KeyboardInterrupt):
-            return "q"
-
-    choice = _read("Select backend [1-5, s=skip, q=quit]: ").lower()
-    if choice in ("q", "quit", ""):
-        UI.info("Wizard aborted — no changes made.")
-        return 0
-
-    if choice in ("s", "skip"):
-        UI.info("Skipping backend setup; keeping registry defaults.")
-        cfg: dict = {"defaults": {}}
-    else:
-        mapping = {"1": "azure", "2": "hf", "3": "github",
-                   "4": "openai", "5": "other"}
-        backend = mapping.get(choice, "azure")
-        cfg = {"defaults": {"provider": backend}}
-
-        if backend == "azure":
-            UI.info("Azure setup: point the SDK at YOUR tenant + Foundry resource.")
-            base = _read("IDUN_BASE (https://<resource>.services.ai.azure.com): ")
-            if base:
-                os.environ["IDUN_BASE"] = base
-                cfg["defaults"]["base"] = base
-            project = _read("IDUN_PROJECT (Foundry project name) [optional]: ")
-            if project:
-                cfg["defaults"]["project"] = project
-            tenant = _read("IDUN_TENANT (tenant guid) [optional]: ")
-            if tenant:
-                cfg["defaults"]["tenant"] = tenant
-            UI.info("Run `idun login --backend azure` to complete the device-code flow.")
-        elif backend == "hf":
-            tok = _read("Hugging Face token (hf_...) [or blank for anonymous]: ")
-            if tok:
-                _save_backend_token("hf", tok)
-            model = _read(f"HF model [default: {get_provider('hf').default_model}]: ")
-            if model:
-                cfg["hf"] = {"model": model}
-        elif backend == "github":
-            tok = _read("GitHub PAT (ghp_... / github_pat_...): ")
-            if not tok:
-                UI.err("GitHub backend requires a PAT. Aborting.")
-                return 1
-            _save_backend_token("openai", tok)
-            model = _read(f"GitHub model [default: {get_provider('openai').default_model}]: ")
-            if model:
-                cfg["openai"] = {"model": model}
-        elif backend == "openai":
-            tok = _read("OpenAI API key (sk-...) [or blank for OPENAI_API_KEY env]: ")
-            if tok:
-                _save_backend_token("openai", tok)
-            model = _read(f"OpenAI model [default: {get_provider('openai').default_model}]: ")
-            if model:
-                cfg["openai"] = dict(cfg.get("openai", {}), model=model)
-            base = _read(f"OpenAI base URL [default: {get_provider('openai').base}]: ")
-            if base:
-                cfg["openai"] = dict(cfg.get("openai", {}), base=base)
-        elif backend == "other":
-            UI.info("Generic OpenAI-compatible endpoint (any vendor).")
-            base = _read("Base URL (https://<host>/v1): ")
-            if not base:
-                UI.err("A base URL is required for 'other'. Aborting.")
-                return 1
-            tok = _read("API key [or blank to read OPENAI_API_KEY env]: ")
-            model = _read("Model id [optional]: ")
-            os.environ["OPENAI_BASE"] = base
-            cfg["openai"] = {"base": base}
-            if tok:
-                _save_backend_token("openai", tok)
-            if model:
-                cfg["openai"]["model"] = model
-
-    # theme pick (harmless; empty -> keep 'classic' default)
-    themes = list_themes()
-    UI.info("Retro themes: " + ", ".join(themes))
-    theme = _read("Theme [default: classic]: ").lower()
-    if theme and theme in themes:
-        cfg.setdefault("defaults", {})["theme"] = theme
-        try:
-            from idun.retro import set_theme
-            set_theme(theme)
-        except Exception:
-            pass
-
-    # write config.toml (benign settings only; secrets live in the .token file)
-    path = C.write_config(cfg)
-    try:
-        os.chmod(path, 0o600)
-    except OSError:
-        pass
-    UI.ok(f"Wrote config -> {path}")
-
-    # smoke test to prove the credentials work (skip when backend was skipped)
-    if cfg.get("defaults", {}).get("provider"):
-        _wizard_test_call(cfg["defaults"]["provider"])
-    UI.info("Done. Try:  idun chat \"Hello\"")
-    return 0
-
-
-def _wizard_test_call(backend: str) -> None:
-    """Best-effort smoke test of the chosen backend; never raises, never
-    prints a scary error. A failed probe is expected when the user picked
-    ``skip``-style defaults or a generic endpoint whose key is not yet live —
-    we only surface a neutral hint, not a red failure.
-    """
-    try:
-        from idun.providers import complete
-        UI.info("Testing connection with a short prompt ...")
-        res = complete(backend, "Reply with the single word: OK", model="",
-                       system="", timeout=20)
-        text = getattr(res, "text", "") or ""
-        UI.ok(f"Backend responded ({len(text)} chars): {text[:60]!r}")
-    except Exception as e:  # noqa: BLE001 - wizard must not crash on a bad key
-        # Neutral, non-alarming: the wizard already succeeded at writing
-        # config; a failed live probe just means "test later".
-        UI.info(f"Connection not verified yet ({type(e).__name__}). "
-                f"You can test any time with: idun chat \"Hello\"")
 
 
 def cmd_token(args):
@@ -523,7 +381,7 @@ def build_parser() -> argparse.ArgumentParser:
         description=("Store credentials for a backend.\n\n"
                      "  idun login --backend azure    (device-code Entra login)\n"
                      "  idun login --backend hf       (Hugging Face token)\n"
-                     "  idun login --backend github   (GitHub PAT)"),
+                     "  idun login --backend openai   (OpenAI API key)"),
     )
     _add_backend_arg(pl)
     pl.set_defaults(func=cmd_login)
@@ -557,7 +415,7 @@ def build_parser() -> argparse.ArgumentParser:
     pc = sub.add_parser(
         "chat",
         help="print final answer",
-        description="Send a prompt and print only the final answer text.\n\nExample:\n  idun chat \"What is the capital of France?\"\n  idun chat --backend github \"Summarize quantum computing\"\n  idun chat --async \"Explain transformers\"",
+        description="Send a prompt and print only the final answer text.\n\nExample:\n  idun chat \"What is the capital of France?\"\n  idun chat --backend openai \"Summarize quantum computing\"\n  idun chat --async \"Explain transformers\"",
     )
     pc.add_argument("prompt", nargs="?", default="")
     _add_common_args(pc)
@@ -585,7 +443,7 @@ def build_parser() -> argparse.ArgumentParser:
     pe = sub.add_parser(
         "export",
         help="run prompt and save agent trajectory",
-        description="Run a prompt and export the full agent trajectory to JSON or markdown.\n\nExample:\n  idun export \"What is the capital of France?\" -o trace.md\n  idun export --backend github \"Explain photosynthesis\" -o trace.json\n  idun export --async \"Tell me a joke\" > out.md",
+        description="Run a prompt and export the full agent trajectory to JSON or markdown.\n\nExample:\n  idun export \"What is the capital of France?\" -o trace.md\n  idun export --backend openai \"Explain photosynthesis\" -o trace.json\n  idun export --async \"Tell me a joke\" > out.md",
     )
     pe.add_argument("prompt")
     pe.add_argument("--format", choices=["json", "md"], default="json", dest="fmt",
@@ -669,6 +527,96 @@ def build_parser() -> argparse.ArgumentParser:
     po.set_defaults(func=cmd_openapi)
 
     return p
+
+
+def run_idun_wizard(_args=None) -> int:
+    """Unified first-run setup. The ONLY writer of first-run config.
+
+    Both `idun wizard` and `idun-multi wizard` delegate here. This function
+    writes a single thing to a single file: ``[defaults] provider = <id>`` in
+    ``~/.idun/config.toml`` (via ``idun.config.write_config``). It does NOT
+    touch ``~/.idunrc`` — that file was the source of the old "kommen wir
+    durcheinander" conflict, because the two wizards wrote to two different
+    files that neither tool consistently read.
+
+    Provider selection uses the provider registry (Option 1): every registered
+    provider plus a "skip" choice. Credentials are prompted interactively with
+    getpass when the chosen provider needs a key; a non-TTY session degrades to
+    a message pointing at `idun login`. See tests/test_idun_wizard.py.
+
+    Returns 0 on success / clean abort, 1 on hard error.
+    """
+    from idun import config as C
+    from idun.providers import REGISTRY, get_provider, save_credential, credential_status
+
+    if not sys.stdin.isatty():
+        UI.err(
+            "`idun-wizard` needs an interactive TTY. Run it in a real terminal, "
+            "or set the provider via `idun-multi login --provider X` / environment "
+            "vars (IDUN_PROVIDER)."
+        )
+        return 1
+
+    provs = list(REGISTRY)
+    rows = [(str(i + 1), p.id, p.label, "free" if p.free_tier else "paid")
+            for i, p in enumerate(provs)]
+    UI.wizard_intro(
+        ["#) id     — provider", "s) skip — keep current defaults",
+         "q) quit — exit without changing anything."]
+    )
+    try:
+        from idun import retro as R
+        print(R.table(rows, headers=("#", "id", "provider", "tier"))) if False else None
+    except Exception:
+        pass
+
+    def _read(prompt: str) -> str:
+        try:
+            return input(prompt).strip()
+        except (EOFError, KeyboardInterrupt):
+            return "q"
+
+    choice = _read(f"Select provider [1-{len(provs)}, s=skip, q=quit]: ").lower()
+    if choice in ("q", "quit", ""):
+        UI.info("Wizard aborted — no changes made.")
+        return 0
+    if choice in ("s", "skip"):
+        UI.info("Skipping provider setup; keeping current defaults.")
+        # still ensure the config file exists (harmless) but do not set provider
+        return 0
+
+    try:
+        idx = int(choice) - 1
+        if not 0 <= idx < len(provs):
+            raise ValueError
+    except ValueError:
+        UI.err("Invalid selection.")
+        return 2
+    p = provs[idx]
+    UI.info(f"selected {p.id}")
+
+    # Credential: only prompt if the provider needs one and none is stored.
+    if p.needs_key and credential_status(p) == "none":
+        import getpass
+        try:
+            tok = getpass.getpass(f"  {p.env_key}: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            tok = ""
+        if tok:
+            save_credential(p, tok)
+            UI.ok("credential stored (0600).")
+        else:
+            UI.info("no key stored — set it later via `idun-multi login`.")
+
+    # Write ONLY the default provider to config.toml. Nothing else, no .idunrc.
+    C.write_config({"defaults": {"provider": p.id}})
+    UI.ok(f"wrote default provider '{p.id}' to {C.CONFIG_PATH}")
+    return 0
+
+
+def cmd_wizard(_args):
+    """`idun wizard` — delegates to the unified idun-wizard (Teil D)."""
+    return run_idun_wizard(_args)
 
 
 def main():

@@ -4,10 +4,38 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idun-sdk"
-version = "1.0.22"
+# Version comes from idun/__init__.py -- the single source of truth. It used to
+# be duplicated as a literal here AND in idun_multi.py, where the copy went
+# stale ("0.2.6" vs 1.0.22). Never hardcode it again.
+dynamic = ["version"]
 description = "Stdlib-only client + CLI for the Azure AI Foundry agent NatureLM-Idun-5-MoE"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 dependencies = []
+
+[tool.setuptools.dynamic]
+version = { attr = "idun.__version__" }
+
+# Console scripts MUST live here, not only in setup.py.
+#
+# PEP 621: once a [project] table exists, setuptools takes project metadata
+# from pyproject.toml and ignores the corresponding keyword arguments in
+# setup.py. Versions 1.0.17-1.0.22 declared entry_points only in setup.py and
+# therefore installed with no console scripts at all ("command not found"),
+# even though the wheel built successfully and the test suite was green.
+# Regression introduced in cfcadf9; last good release was 1.0.16.
+# Covered by tests/test_packaging_contract.py -- do not remove.
+[project.scripts]
+idun = "idun_cli:main"
+idun-multi = "idun_multi:main"
+idun-mcp = "idun_mcp:main"
+
+# Only the three top-level CLI modules plus the idun package are shipped; the
+# repo root also holds tests/ and helper scripts that must not be installed.
+[tool.setuptools]
+py-modules = ["idun_cli", "idun_multi", "idun_mcp"]
+
+[tool.setuptools.packages.find]
+include = ["idun*"]
 

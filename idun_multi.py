@@ -21,10 +21,13 @@ import json
 import os
 import sys
 
+from idun import __version__ as VERSION
 from idun import providers as P
 from idun import retro as R
 
-VERSION = "0.2.6"
+# VERSION is imported, never copied: a hardcoded literal here read "0.2.6" while
+# the package was 1.0.22, so `idun-multi --version` and `idun-multi doctor` both
+# reported a four-minor-old version. See tests/test_version_consistency.py.
 RC_PATH = os.path.join(os.path.expanduser("~"), ".idunrc")
 
 
@@ -396,71 +399,16 @@ def cmd_doctor(_args) -> int:
     return 0 if ready else 1
 
 
+
 def cmd_wizard(args) -> int:
-    """Interactive setup. Non-interactive stdin degrades gracefully."""
-    print(R.logo(VERSION))
-    print()
-    provs = list(P.list_providers())
-    rows = [(str(i + 1), p.id, p.label, "free" if p.free_tier else "paid")
-            for i, p in enumerate(provs)]
-    print(R.box(R.table(rows, headers=("#", "id", "provider", "tier")).split("\n"),
-                title="SELECT A PROVIDER"))
-    print()
+    """`idun-multi wizard` — delegates to the unified idun-wizard (Teil D).
 
-    if not sys.stdin.isatty():
-        print(R.status("warn", "stdin is not a TTY — wizard needs an interactive "
-                               "shell."))
-        print(R.status("info", "non-interactive alternative:"))
-        print("    idun-multi login --provider groq   # then type the key at the prompt")
-        print("    export IDUN_PROVIDER=groq")
-        return 1
-
-    try:
-        choice = input(R.paint("  select [1-%d]: " % len(provs), "accent")).strip()
-    except (EOFError, KeyboardInterrupt):
-        print()
-        print(R.status("warn", "aborted."))
-        return 1
-    if not choice.isdigit() or not 1 <= int(choice) <= len(provs):
-        print(R.status("err", "invalid selection."))
-        return 2
-    p = provs[int(choice) - 1]
-    print(R.status("ok", f"selected {R.paint(p.id, 'accent', 'bold')}"))
-
-    if p.needs_key and P.credential_status(p) == "none":
-        import getpass
-        try:
-            tok = getpass.getpass(f"  {p.env_key}: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            tok = ""
-        if tok:
-            P.save_credential(p, tok)
-            print(R.status("ok", "credential stored (0600)."))
-        else:
-            print(R.status("warn", "no key stored — set it later via login."))
-
-    model = ""
-    try:
-        model = input(f"  model [{p.resolved_model()}]: ").strip()
-    except (EOFError, KeyboardInterrupt):
-        pass
-
-    cfg = {"IDUN_PROVIDER": p.id}
-    if model:
-        cfg[p.model_env()] = model
-    with open(RC_PATH, "a", encoding="utf-8") as fh:
-        fh.write("\n# idun-multi wizard\n")
-        for k, v in cfg.items():
-            fh.write(f"export {k}={v}\n")
-    os.chmod(RC_PATH, 0o600)
-
-    print()
-    print(R.box([f"wrote {RC_PATH}",
-                 "source ~/.idunrc   # activate in this shell",
-                 f"idun-multi ask \"hello\"   # talk to {p.id}"],
-                title="NEXT STEPS"))
-    return 0
-
+    The unified wizard (idun_cli.run_idun_wizard) is the single writer of
+    first-run config: it writes only [defaults] provider to config.toml.
+    This command no longer writes ~/.idunrc (the old conflict source).
+    """
+    from idun_cli import run_idun_wizard
+    return run_idun_wizard(args)
 
 def cmd_shell(args) -> int:
     """Interactive multi-turn REPL.

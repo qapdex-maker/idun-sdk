@@ -7,6 +7,8 @@ the legacy IdunClient for external providers.
 """
 import argparse
 
+import pytest
+
 import idun_cli as cli
 from idun import IdunClient
 from idun import providers as P
@@ -23,19 +25,25 @@ def test_invalid_backend_rejected():
         IdunClient(backend="nope")
 
 
-def test_github_alias_resolves_to_openai():
-    c = IdunClient(backend="github")
-    # 'github' is a legacy alias for the openai transport
-    assert c.backend == "openai"
+def test_github_backend_is_rejected():
+    """'github' must not resolve to another provider's transport/credentials.
+
+    This test previously asserted the opposite (backend='github' -> 'openai').
+    That alias was the bug: a GitHub PAT ended up in ~/.idun/openai.token and
+    was sent to api.openai.com. GitHub Models is a separate service; if it is
+    ever supported it gets its own REGISTRY entry and its own token file.
+    See tests/test_no_provider_aliasing.py.
+    """
+    with pytest.raises(ValueError):
+        IdunClient(backend="github")
 
 
 def test_env_overrides_for_models(monkeypatch):
     monkeypatch.setenv("HF_MODEL", "microsoft/phi-2")
-    # github is an alias for the openai transport, so OPENAI_MODEL applies
     monkeypatch.setenv("OPENAI_MODEL", "gpt-4o")
     c = IdunClient(backend="hf")
     assert c.hf_model == "microsoft/phi-2"
-    c2 = IdunClient(backend="github")
+    c2 = IdunClient(backend="openai")
     assert c2.openai_model == "gpt-4o"
 
 

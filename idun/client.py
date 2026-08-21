@@ -230,15 +230,14 @@ class IdunClient:
         backend: Optional[str] = None,
         hf_token: Optional[str] = None,
         hf_model: Optional[str] = None,
-        github_token: Optional[str] = None,
-        github_model: Optional[str] = None,
         openai_token: Optional[str] = None,
         openai_model: Optional[str] = None,
         openai_base: Optional[str] = None,
     ) -> None:
         # --- backend selection (multi-backend support) ---
         # The provider registry in providers.py is the single source of truth.
-        # 'github' is a legacy alias for the openai transport.
+        # There are no aliases: 'github' was removed because it mapped onto the
+        # openai provider and its token file (see providers.get_provider).
         self.backend = (backend or os.environ.get("IDUN_BACKEND", "azure")).strip().lower()
         try:
             self._provider = get_provider(self.backend)
@@ -252,13 +251,10 @@ class IdunClient:
         if p.id == "hf":
             self.hf_token = hf_token if hf_token is not None else resolve_credential(p)
             self.hf_model = hf_model or os.environ.get("HF_MODEL") or p.resolved_model()
-        elif p.id == "openai" or p.id == "github":
+        elif p.id == "openai":
             self.openai_token = openai_token if openai_token is not None else resolve_credential(p)
             self.openai_model = openai_model or os.environ.get("OPENAI_MODEL") or p.resolved_model()
             self.openai_base = openai_base or os.environ.get("OPENAI_BASE") or p.resolved_base()
-        # github is served through the openai transport under the openai id
-        if self.backend == "github":
-            self.backend = "openai"
         # --- azure config: explicit arg > environment > (no tenant default) ---
         self.token = token or os.environ.get("FOUNDRY_TOKEN")
         self.base = (base if base is not None else foundry_base()).rstrip("/")
@@ -345,7 +341,7 @@ class IdunClient:
 
         Backend dispatch:
           - azure : Foundry agent (token-managed, retries on 5xx/401).
-          - hf / github : external backends, no Foundry token needed.
+          - hf / openai : external backends, no Foundry token needed.
 
         The non-azure backends return a flat answer (no tool-agent trajectory),
         so `steps` is empty and `model` is the backend model id.

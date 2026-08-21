@@ -191,15 +191,26 @@ def test_error_body_secrets_are_redacted():
 
 
 def test_hf_transport_prepends_system_prompt(monkeypatch):
+    """The hf provider now uses the OpenAI-compatible router dialect.
+
+    Before the migration hf spoke the legacy inference API (a single "inputs"
+    field, "generated_text" response). After pointing at router.huggingface.co
+    it builds an OpenAI-style messages payload, so the system prompt must land
+    in messages[0] -- not in an "inputs" string.
+    """
     captured = {}
 
     def fake_post(url, body, headers, timeout):
-        captured["inputs"] = body["inputs"]
-        return {"generated_text": "ok"}
+        captured["body"] = body
+        # emulate an OpenAI-style response
+        return {"choices": [{"message": {"content": "ok"}}]}
 
-    monkeypatch.setenv("HF_API_KEY", "t")
+    monkeypatch.setenv("HF_TOKEN", "t")
     monkeypatch.setattr(providers, "_post_json", fake_post)
     providers.complete("hf", "hi there", model="m",
                        system="You are terse.")
-    assert captured["inputs"].startswith("You are terse.")
-    assert "hi there" in captured["inputs"]
+    body = captured["body"]
+    assert body["model"] == "m"
+    msgs = body["messages"]
+    assert msgs[0] == {"role": "system", "content": "You are terse."}
+    assert msgs[1] == {"role": "user", "content": "hi there"}
