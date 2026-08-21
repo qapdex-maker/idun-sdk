@@ -401,7 +401,7 @@ def build_parser() -> argparse.ArgumentParser:
     pw = sub.add_parser(
         "wizard",
         help="universal first-run setup for any user",
-        description="Interactive setup wizard: picks a backend, captures creds/config, writes ~/.idunrc so every future `idun` call uses it globally.\n\nExample:\n  idun wizard",
+        description="Interactive setup wizard: picks a provider, writes the default to ~/.idun/config.toml. Delegates to the unified idun-wizard.\n\nExample:\n  idun wizard",
     )
     pw.set_defaults(func=cmd_wizard)
 

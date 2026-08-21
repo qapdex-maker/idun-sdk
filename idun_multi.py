@@ -359,8 +359,10 @@ def cmd_doctor(_args) -> int:
         f"config dir  : {P.CONFIG_DIR}"
         + (" (present)" if os.path.isdir(P.CONFIG_DIR) else " (missing)"),
         f"active      : {P.default_provider()}",
-        f"rc file     : {RC_PATH}"
-        + (" (present)" if os.path.exists(RC_PATH) else " (absent)"),
+        # NOTE: .idunrc is no longer written by any wizard (it caused the
+        # config conflict). Kept as an informational line only if it exists.
+        (f"rc file     : {RC_PATH} (present)" if os.path.exists(RC_PATH)
+         else "rc file     : ~/.idunrc (absent — no longer used)"),
         f"colour      : {'on' if R.color_enabled() else 'off'}",
         f"theme       : {R.theme()}",
     ]
