@@ -204,8 +204,8 @@ def cmd_hf(args):
     sub = args.hf_command
     if sub == "whoami":
         if not token:
-            UI.err("HF token missing. Set HF_TOKEN or ~/hf_token.txt "
-                   "(idun login --backend hf).")
+            UI.err("HF token missing. Set HF_TOKEN or store it via "
+                   "`idun-multi login --backend hf` (writes ~/.idun/hf.token).")
             return 1
         try:
             info = hf.hf_whoami(token)
@@ -233,7 +233,8 @@ def cmd_hf(args):
         return 0
     if sub == "push":
         if not token:
-            UI.err("HF token missing. Set HF_TOKEN or ~/hf_token.txt.")
+            UI.err("HF token missing. Set HF_TOKEN or store it via "
+                   "`idun-multi login --backend hf` (writes ~/.idun/hf.token).")
             return 1
         model = args.model
         files = {}

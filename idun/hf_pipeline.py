@@ -22,13 +22,18 @@ import urllib.error
 import urllib.request
 
 HF_API = "https://huggingface.co"
-HF_INFERENCE = "https://api-inference.huggingface.co"
+# Inference now goes through the OpenAI-compatible router. The old
+# api-inference.huggingface.co host was retired and no longer resolves
+# (same dead host as the old `hf` provider, BUG 5/BUG 7). The router exposes
+# /v1/chat/completions, so hf_infer speaks the OpenAI dialect.
+HF_INFERENCE = "https://router.huggingface.co/v1"
 
-# Common serverless models for quick trials. Not exhaustive.
+# Common serverless models for quick trials. Not exhaustive. Must exist on the
+# router — verified against the live model list during the BUG 7 fix.
 SUGGESTED_TEXT_MODELS = (
-    "microsoft/phi-3-mini-4k-instruct",
-    "google/gemma-2-2b-it",
-    "meta-llama/Llama-3.1-8B-Instruct",
+    "deepseek-ai/DeepSeek-V4-Flash",
+    "google/gemma-4-26B-A4B-it",
+    "Qwen/Qwen3.5-9B",
 )
 
 
@@ -37,10 +42,23 @@ SUGGESTED_TEXT_MODELS = (
 # --------------------------------------------------------------------------
 
 def load_hf_token() -> str:
-    """HF token from HF_TOKEN / HUGGING_FACE_HUB_TOKEN env or ~/hf_token.txt."""
+    """HF token from env or the idun token store.
+
+    Order: HF_TOKEN / HUGGING_FACE_HUB_TOKEN env, then ~/.idun/hf.token (the
+    file written by `idun-multi login --backend hf` and the unified wizard).
+    Kept stdlib-only; falls back to the legacy ~/hf_token.txt if present.
+    """
     env = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
     if env:
         return env
+    idun_file = os.path.join(os.path.expanduser("~"), ".idun", "hf.token")
+    try:
+        with open(idun_file, encoding="utf-8") as f:
+            tok = f.read().strip()
+            if tok:
+                return tok
+    except OSError:
+        pass
     try:
         with open(os.path.join(os.path.expanduser("~"), "hf_token.txt"),
                   encoding="utf-8") as f:
@@ -54,29 +72,28 @@ def load_hf_token() -> str:
 # --------------------------------------------------------------------------
 
 def _extract_text(raw: object) -> str:
-    """Pull generated text out of the various HF Inference response shapes."""
-    if isinstance(raw, list) and raw:
-        raw = raw[0]
+    """Pull assistant text out of an OpenAI-style response."""
     if isinstance(raw, dict):
-        gt = raw.get("generated_text")
-        if isinstance(gt, dict):
-            return gt.get("content") or gt.get("text") or ""
-        return str(gt or "")
+        try:
+            return raw["choices"][0]["message"]["content"] or ""
+        except (KeyError, IndexError, TypeError):
+            return json.dumps(raw, ensure_ascii=False)[:400]
     return str(raw or "")
 
 
-def hf_infer(prompt: str, token: str = "", model: str = "microsoft/phi-3-mini-4k-instruct",
+def hf_infer(prompt: str, token: str = "", model: str = "deepseek-ai/DeepSeek-V4-Flash",
              timeout: int = 120, max_new_tokens: int = 1024) -> str:
-    """Run a prompt through the HF Inference API (serverless).
+    """Run a prompt through the HF Inference router (OpenAI-compatible /v1).
 
     Returns the generated text. Raises RuntimeError on HTTP error with the
     response body so callers can surface model-specific issues (e.g. a model
     still loading, or gated-access denied).
     """
-    url = f"{HF_INFERENCE}/models/{model}"
+    url = f"{HF_INFERENCE}/chat/completions"
     body = {
-        "inputs": prompt,
-        "parameters": {"max_new_tokens": max_new_tokens, "return_full_text": False},
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_new_tokens,
     }
     headers = {"Content-Type": "application/json"}
     if token:
