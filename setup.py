@@ -77,6 +77,9 @@ setup(
     python_requires=">=3.8",
     # stdlib-only: no runtime dependencies. Works headless on Termux.
     install_requires=[],
+    # Optional extra: PDF ingestion for `idun matrix` / `idun diff-docs` (.pdf docs).
+    # Must mirror pyproject.toml [project.optional-dependencies] (PEP 621 source).
+    extras_require={"pdf": ["PyPDF2"]},
     cmdclass=_cmdclass,
     entry_points={"console_scripts": [
         "idun=idun_cli:main",

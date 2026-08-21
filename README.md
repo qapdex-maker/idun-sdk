@@ -28,25 +28,30 @@ out = client.complete("Summarize the quarterly risk report.")
 print(out["text"])
 ```
 
-### Two CLIs — two setup wizards
+### Two CLIs — two separate setup wizards (intentionally, not one)
 
-This package ships **two** command-line tools with distinct purposes, and each
-has its **own** first-run setup wizard:
+This package ships **two** command-line tools with distinct purposes. They are
+**intentionally kept separate** — `idun` is the Azure AI Foundry client,
+`idun-multi` is the multi-provider LLM console. There is **no** unified
+`idun-wizard`; each tool has its **own** first-run setup wizard:
 
 - **`idun`** — the Azure AI Foundry client. Agent completions, trajectory
-  export, document matrix (`idun matrix`), prompt packs (`idun packs` /
-  `idun run`), and Hugging Face Hub operations (`idun hf`). Azure-specific.
+  export, document matrix (`idun matrix`), prompt packs (`idun run` /
+  `idun packs`), and Hugging Face Hub operations (`idun hf`). Azure-specific.
   - `idun wizard` configures the **Azure Foundry client** (endpoint /
     project / agent) in `~/.idun/config.toml`.
 - **`idun-multi`** — the multi-provider LLM console. Talks to any of the 17
   registered providers (OpenAI, Anthropic, Groq, OpenRouter, HF, …) plus
   `race`, `cost`, `models`, `doctor`, `support`. Provider-agnostic.
   - `idun-multi wizard` configures the **default LLM provider** (picks one of
-    the 17 registered providers) in `~/.idun/config.toml`.
+    the 17 registered providers, and **prints the provider table** so you can
+    choose) in `~/.idun/config.toml`.
 
-Both wizards write only to `~/.idun/config.toml` (never `~/.idunrc`, which is
-no longer used). Credentials live in per-provider `~/.idun/<id>.token` files
-(0600).
+The two wizards were previously unified, but that version was broken (the
+provider table was never printed) and was corrected back into two separate
+wizards. **Both wizards write only to `~/.idun/config.toml`** (never `~/.idunrc`,
+which is no longer used). Credentials live in per-provider `~/.idun/<id>.token`
+files (0600).
 
 ```text
 idun-multi providers        # list providers + credential status
@@ -77,15 +82,21 @@ asyncio.run(main())
 
 ```text
 idun chat "your prompt"        # one-shot completion
+idun trace "your prompt"       # full agent trajectory (steps)
+idun export "your prompt" -o trace.md   # run + save trajectory (json/md)
+idun token                     # inspect / rotate stored Entra token
+idun login                     # device-code login to your Foundry (azure/hf/openai)
+idun status                    # show resolved backend + credential state
 idun run <pack> <key>          # run a bundled prompt pack
 idun packs                     # list bundled prompt packs
 idun matrix  --docs DIR --questions FILE   # Doc x Question pivot (IDEA α)
 idun diff-docs --doc-a A --doc-b B --topics T  # clause-drift compare (IDEA γ)
+idun diff "A" "B"              # compare two prompt trajectories side-by-side
 idun hf whoami|status|push     # Hugging Face Hub operations
-idun login                     # device-code login to your Foundry
-idun status                    # show token / config state
-idun wizard                    # configure the Azure Foundry client
+idun openapi                   # print the bundled OpenAPI 3 spec for the completion API
+idun logo                      # show bundled Foundry logo paths
 idun welcome                   # ASCII banner
+idun wizard                    # configure the Azure Foundry client
 ```
 
 **`idun-multi`** — multi-provider LLM console (`-p <provider>` goes BEFORE the subcommand):

@@ -23,6 +23,12 @@ Playground = "https://github.com/qapdex-maker/idun-playground"
 Docs = "https://gitmcp.io/qapdex-maker/idun-sdk/sse"
 Bug-Tracker = "https://github.com/qapdex-maker/idun-sdk/issues"
 
+# Optional extra: PDF ingestion for `idun matrix` / `idun diff-docs` (.pdf docs).
+# .txt/.md need no extra. Declared here (PEP 621) AND in setup.py.extras_require
+# so both metadata sources agree (same drift class as B5).
+[project.optional-dependencies]
+pdf = ["PyPDF2"]
+
 # Console scripts MUST live here, not only in setup.py.
 #
 # PEP 621: once a [project] table exists, setuptools takes project metadata

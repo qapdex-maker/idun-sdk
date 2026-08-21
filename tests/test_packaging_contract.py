@@ -175,3 +175,24 @@ def test_no_metadata_duplication_for_scripts():
         "Under PEP 621 this makes setuptools ignore entry_points from "
         "setup.py, so no console scripts get installed."
     )
+
+
+@requires_install
+def test_pdf_extra_declared_in_metadata():
+    """`pip install "idun-sdk[pdf]"` must be a real extra, not a phantom.
+
+    idun/ingest.py and the README advertise `idun-sdk[pdf]` (PyPDF2) for PDF
+    ingestion, but the extra was never declared in setup.py / pyproject.toml.
+    So `pip install "idun-sdk[pdf]"` failed with "unknown extra" while the
+    code told users to use it. Bind the extra to the installed metadata so the
+    next disappearance fails CI instead of shipping a broken instruction.
+    """
+    dist = _dist()
+    if dist is None:
+        pytest.skip(f"{DIST_NAME} is not installed; packaging contract not applicable")
+    extras = set(dist.metadata.get_all("Provides-Extra") or [])
+    assert "pdf" in extras, (
+        "idun-sdk[pdf] extra is not declared in the installed metadata. "
+        "Add it to pyproject.toml [project.optional-dependencies] AND "
+        "setup.py extras_require (mirror both, same drift class as B5)."
+    )
