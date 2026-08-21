@@ -4,6 +4,37 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.23] — 2026-08-21
+
+### Fixed (verified, each with a red-then-green regression test)
+- **BUG 1 / B2:** `save_credential` used `O_CREAT|O_EXCL` with no
+  `FileExistsError` handling — a second save crashed and left the old token
+  unoverwritable. Now atomic: temp file + `fchmod 0600` + `os.replace()`.
+- **BUG 2 / B3:** `github` was silently aliased onto `openai` in
+  `get_provider()`; the login/wizard flow stored a GitHub PAT in
+  `~/.idun/openai.token` and sent it to `api.openai.com`. Alias removed; clear
+  error message instead. (GitHub Models is a separate service.)
+- **BUG 3 / B1:** console scripts (`idun`, `idun-multi`, `idun-mcp`) were not
+  installed — `pyproject.toml` had a `[project]` table but no
+  `[project.scripts]` (PEP 621 shadowed setup.py's entry_points). Added.
+- **BUG 4 / B4:** `install.sh` never checked `setuptools` and printed a fake
+  success note when a console script was absent. Now aborts with exit 1.
+- **BUG 5 / B5:** `hf` provider pointed at the retired
+  `api-inference.huggingface.co` host. Migrated to
+  `https://router.huggingface.co/v1` (OpenAI-compatible, `needs_key=True`).
+- **BUG 6 / B6:** `idun_multi.py` hardcoded `VERSION="0.2.6"` while the package
+  was 1.0.22. Now imports `idun.__version__`.
+- **BUG 7:** `idun hf` inference command used the same dead host; migrated to
+  the router and unified the token source (`~/.idun/hf.token`).
+- **Wizard (D):** unified `idun-wizard`; `idun wizard` and `idun-multi wizard`
+  now delegate. The two old wizards wrote to different files (config.toml vs
+  `.idunrc`) that neither tool consistently read.
+
+### Docs
+- README: two-CLI explanation (Azure Foundry client vs multi-provider console),
+  single setup entry point, corrected config section, provider tested/untested
+  table.
+
 ## [1.0.22] — 2026-08-19
 
 ### Docs only (no code change)
