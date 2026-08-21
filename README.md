@@ -73,26 +73,40 @@ asyncio.run(main())
 
 ## CLI
 
+**`idun`** — Azure AI Foundry client:
+
 ```text
-idun chat "your prompt"                    # one-shot completion
-idun chat --async "your prompt"           # async path
-idun run <pack> <key>                     # run a bundled prompt pack
-idun packs                                # list bundled prompt packs
-idun login                               # device-code login to your Foundry
-idun status                              # show token / config state
-idun wizard                              # configure the Azure Foundry client
-idun welcome                             # ASCII banner
-idun matrix  --docs DIR  --questions FILE   # Doc x Question pivot (IDEA α)
+idun chat "your prompt"        # one-shot completion
+idun run <pack> <key>          # run a bundled prompt pack
+idun packs                     # list bundled prompt packs
+idun matrix  --docs DIR --questions FILE   # Doc x Question pivot (IDEA α)
 idun diff-docs --doc-a A --doc-b B --topics T  # clause-drift compare (IDEA γ)
+idun hf whoami|status|push     # Hugging Face Hub operations
+idun login                     # device-code login to your Foundry
+idun status                    # show token / config state
+idun wizard                    # configure the Azure Foundry client
+idun welcome                   # ASCII banner
+```
+
+**`idun-multi`** — multi-provider LLM console (`-p <provider>` goes BEFORE the subcommand):
+
+```text
+idun-multi providers          # list providers + credential status
+idun-multi -p openrouter ask "hello"   # chat with a provider
+idun-multi race "explain quantum"      # compare providers on one prompt
+idun-multi models              # list models (or --discover)
+idun-multi cost                # token / cost estimate
+idun-multi doctor              # environment + credential audit
+idun-multi wizard              # pick the default LLM provider
 ```
 
 ## Supported providers
 
 The `idun` CLI / `IdunClient` speak to any OpenAI-compatible endpoint plus the
-native Azure AI Foundry transport. Registered providers (3 transports):
+native Azure AI Foundry transport. Registered providers (4 groups):
 
 - **OpenAI-compatible:** `openai`, `groq`, `together`, `perplexity`, `fireworks`,
-  `novita`, `xai`, `deepseek`, `mistral`, `openrouter`, `gemini`, `hf`
+  `novita`, `xai`, `deepseek`, `mistral`, `openrouter`, `gemini`, `hf`, `nous`
 - **Anthropic:** `anthropic` (Claude)
 - **Azure:** `azure` (Azure AI Foundry / Idun agent)
 - **Local:** `ollama`, `local` (bring your own endpoint)
@@ -127,11 +141,18 @@ config and the provider switches automatically. See
 to per-provider `~/.idun/<id>.token` files (mode 0600), **not** in this file:
 
 ```toml
+# Written by `idun-multi wizard` (LLM provider default):
 [defaults]
-provider = "openrouter"   # selected by `idun-wizard`
+provider = "openrouter"
 
 [openrouter]
 model = "deepseek/deepseek-chat"
+
+# Written by `idun wizard` (Azure AI Foundry client):
+[azure]
+base   = "https://YOUR-RESOURCE.services.ai.azure.com"
+agent  = "your-agent-name"
+project = "your-project"
 ```
 
 No tenant coordinates are baked into the shipped code. The CLI reads the config
