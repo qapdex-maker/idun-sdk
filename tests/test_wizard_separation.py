@@ -20,9 +20,6 @@ assert the real, usable behaviour.
 from __future__ import annotations
 
 import io
-import os
-import pathlib
-import tempfile
 import contextlib
 from unittest import mock
 

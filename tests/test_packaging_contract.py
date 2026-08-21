@@ -21,7 +21,6 @@ installed, so a bare ``pytest`` in a fresh checkout stays usable.
 from __future__ import annotations
 
 import subprocess
-import sys
 
 import pytest
 

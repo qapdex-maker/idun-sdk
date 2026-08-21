@@ -424,7 +424,7 @@ def cmd_wizard(args) -> int:
         return 1
 
     from idun import config as C
-    from idun.providers import REGISTRY, get_provider, save_credential, credential_status
+    from idun.providers import REGISTRY, save_credential, credential_status
 
     provs = list(REGISTRY)
     # Build and PRINT the provider table so the user can actually choose.
