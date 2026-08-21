@@ -28,32 +28,33 @@ out = client.complete("Summarize the quarterly risk report.")
 print(out["text"])
 ```
 
-### Two CLIs — one setup
+### Two CLIs — two setup wizards
 
-This package ships **two** command-line tools with distinct purposes:
+This package ships **two** command-line tools with distinct purposes, and each
+has its **own** first-run setup wizard:
 
 - **`idun`** — the Azure AI Foundry client. Agent completions, trajectory
   export, document matrix (`idun matrix`), prompt packs (`idun packs` /
   `idun run`), and Hugging Face Hub operations (`idun hf`). Azure-specific.
+  - `idun wizard` configures the **Azure Foundry client** (endpoint /
+    project / agent) in `~/.idun/config.toml`.
 - **`idun-multi`** — the multi-provider LLM console. Talks to any of the 17
   registered providers (OpenAI, Anthropic, Groq, OpenRouter, HF, …) plus
   `race`, `cost`, `models`, `doctor`, `support`. Provider-agnostic.
+  - `idun-multi wizard` configures the **default LLM provider** (picks one of
+    the 17 registered providers) in `~/.idun/config.toml`.
 
-Both read the **same** `~/.idun/config.toml`. There is exactly **one** setup
-entry point — `idun-wizard` (also reachable as `idun wizard` and
-`idun-multi wizard`, both of which delegate to it). It writes only the default
-provider; credentials live in per-provider `~/.idun/<id>.token` files (0600).
-
-> Do not run two different setup wizards — there is now only one. The old
-> `idun-multi wizard` used to write `~/.idunrc`; that file is no longer used.
+Both wizards write only to `~/.idun/config.toml` (never `~/.idunrc`, which is
+no longer used). Credentials live in per-provider `~/.idun/<id>.token` files
+(0600).
 
 ```text
 idun-multi providers        # list providers + credential status
 idun-multi -p openrouter ask "hello"   # -p goes BEFORE the subcommand
 idun-multi race "explain quantum"      # compare providers on one prompt
 idun-multi doctor            # environment + credential audit (also checks scripts)
-idun-multi wizard            # -> idun-wizard (shared setup)
-idun wizard                  # -> idun-wizard (shared setup)
+idun-multi wizard            # pick the default LLM provider
+idun wizard                  # configure the Azure Foundry client
 ```
 
 ### Async
@@ -79,9 +80,8 @@ idun run <pack> <key>                     # run a bundled prompt pack
 idun packs                                # list bundled prompt packs
 idun login                               # device-code login to your Foundry
 idun status                              # show token / config state
-idun wizard                              # interactive setup (1-5, s skip, q quit)
+idun wizard                              # configure the Azure Foundry client
 idun welcome                             # ASCII banner
-idun export <file>                       # export conversation / config
 idun matrix  --docs DIR  --questions FILE   # Doc x Question pivot (IDEA α)
 idun diff-docs --doc-a A --doc-b B --topics T  # clause-drift compare (IDEA γ)
 ```

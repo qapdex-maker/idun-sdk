@@ -402,7 +402,7 @@ def build_parser() -> argparse.ArgumentParser:
     pw = sub.add_parser(
         "wizard",
         help="universal first-run setup for any user",
-        description="Interactive setup wizard: picks a provider, writes the default to ~/.idun/config.toml. Delegates to the unified idun-wizard.\n\nExample:\n  idun wizard",
+        description="Interactive setup for the Azure AI Foundry client (idun): endpoint / project / agent.\n\nExample:\n  idun wizard",
     )
     pw.set_defaults(func=cmd_wizard)
 
@@ -530,46 +530,34 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def run_idun_wizard(_args=None) -> int:
-    """Unified first-run setup. The ONLY writer of first-run config.
 
-    Both `idun wizard` and `idun-multi wizard` delegate here. This function
-    writes a single thing to a single file: ``[defaults] provider = <id>`` in
-    ``~/.idun/config.toml`` (via ``idun.config.write_config``). It does NOT
-    touch ``~/.idunrc`` — that file was the source of the old "kommen wir
-    durcheinander" conflict, because the two wizards wrote to two different
-    files that neither tool consistently read.
+def cmd_wizard(_args):
+    """`idun wizard` — first-run setup for the Azure AI Foundry client.
 
-    Provider selection uses the provider registry (Option 1): every registered
-    provider plus a "skip" choice. Credentials are prompted interactively with
-    getpass when the chosen provider needs a key; a non-TTY session degrades to
-    a message pointing at `idun login`. See tests/test_idun_wizard.py.
+    Configures the Azure-specific settings (endpoint / project / agent) that
+    `idun` (the Foundry client) needs, and writes them to ~/.idun/config.toml.
+    Credentials are handled separately by `idun login --backend azure`.
 
-    Returns 0 on success / clean abort, 1 on hard error.
+    This is intentionally SEPARATE from `idun-multi wizard`, which configures
+    the LLM providers. Both write only to config.toml (never ~/.idunrc), so
+    there is no cross-file conflict — but they manage different sections.
     """
-    from idun import config as C
-    from idun.providers import REGISTRY, get_provider, save_credential, credential_status
-
     if not sys.stdin.isatty():
         UI.err(
-            "`idun-wizard` needs an interactive TTY. Run it in a real terminal, "
-            "or set the provider via `idun-multi login --provider X` / environment "
-            "vars (IDUN_PROVIDER)."
+            "`idun wizard` needs an interactive TTY. Run it in a real terminal, "
+            "or set credentials via `idun login --backend azure` / environment "
+            "vars (IDUN_BASE, IDUN_PROJECT, IDUN_AGENT)."
         )
         return 1
 
-    provs = list(REGISTRY)
-    rows = [(str(i + 1), p.id, p.label, "free" if p.free_tier else "paid")
-            for i, p in enumerate(provs)]
-    UI.wizard_intro(
-        ["#) id     — provider", "s) skip — keep current defaults",
-         "q) quit — exit without changing anything."]
-    )
-    try:
-        from idun import retro as R
-        print(R.table(rows, headers=("#", "id", "provider", "tier"))) if False else None
-    except Exception:
-        pass
+    from idun import config as C
+
+    UI.wizard_intro([
+        "This sets up the Azure AI Foundry client (idun).",
+        "1) azure  — point the SDK at YOUR Foundry resource",
+        "s) skip   — keep current config",
+        "q) quit   — exit without changing anything",
+    ])
 
     def _read(prompt: str) -> str:
         try:
@@ -577,47 +565,31 @@ def run_idun_wizard(_args=None) -> int:
         except (EOFError, KeyboardInterrupt):
             return "q"
 
-    choice = _read(f"Select provider [1-{len(provs)}, s=skip, q=quit]: ").lower()
+    choice = _read("Select [1, s=skip, q=quit]: ").lower()
     if choice in ("q", "quit", ""):
         UI.info("Wizard aborted — no changes made.")
         return 0
     if choice in ("s", "skip"):
-        UI.info("Skipping provider setup; keeping current defaults.")
-        # still ensure the config file exists (harmless) but do not set provider
+        UI.info("Skipping Azure setup; keeping current config.")
         return 0
 
-    try:
-        idx = int(choice) - 1
-        if not 0 <= idx < len(provs):
-            raise ValueError
-    except ValueError:
-        UI.err("Invalid selection.")
-        return 2
-    p = provs[idx]
-    UI.info(f"selected {p.id}")
-
-    # Credential: only prompt if the provider needs one and none is stored.
-    if p.needs_key and credential_status(p) == "none":
-        import getpass
-        try:
-            tok = getpass.getpass(f"  {p.env_key}: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            tok = ""
-        if tok:
-            save_credential(p, tok)
-            UI.ok("credential stored (0600).")
-        else:
-            UI.info("no key stored — set it later via `idun-multi login`.")
-
-    # Write ONLY the default provider to config.toml. Nothing else, no .idunrc.
-    C.write_config({"defaults": {"provider": p.id}})
-    UI.ok(f"wrote default provider '{p.id}' to {C.CONFIG_PATH}")
+    cfg: dict = {"defaults": {}}
+    base = _read("IDUN_BASE (https://<resource>.services.ai.azure.com): ")
+    if base:
+        cfg["azure"] = {"base": base}
+        agent = _read("IDUN_AGENT (agent name) [optional]: ")
+        if agent:
+            cfg["azure"]["agent"] = agent
+        project = _read("IDUN_PROJECT (Foundry project) [optional]: ")
+        if project:
+            cfg["azure"]["project"] = project
+        UI.info("Run `idun login --backend azure` to complete the device-code flow.")
+        C.write_config(cfg)
+        UI.ok(f"wrote Azure config to {C.CONFIG_PATH}")
+    else:
+        UI.err("No base URL given — nothing to save.")
+        return 1
     return 0
-
-
-def cmd_wizard(_args):
-    """`idun wizard` — delegates to the unified idun-wizard (Teil D)."""
-    return run_idun_wizard(_args)
 
 
 def main():

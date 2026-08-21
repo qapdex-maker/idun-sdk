@@ -4,6 +4,20 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.24] — 2026-08-21
+
+### Fixed: wizard separation (correction to 1.0.23)
+- `idun wizard` and `idun-multi wizard` are now SEPARATE setup wizards again:
+  `idun wizard` configures the Azure AI Foundry client (endpoint / project /
+  agent); `idun-multi wizard` picks the default LLM provider from the 17
+  registered providers. The 1.0.23 "unified" wizard was a misread of the
+  requirement and was unusable (it never printed the provider table, so there
+  was nothing to select).
+- Both write only to `~/.idun/config.toml` (never `~/.idunrc`); they manage
+  different sections, so no config conflict.
+- `idun-multi wizard` now actually prints the provider table (the 1.0.23 dead
+  code `print(...) if False else None` is gone).
+
 ## [1.0.23] — 2026-08-21
 
 ### Fixed (verified, each with a red-then-green regression test)

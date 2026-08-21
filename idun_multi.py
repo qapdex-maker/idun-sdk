@@ -24,6 +24,7 @@ import sys
 from idun import __version__ as VERSION
 from idun import providers as P
 from idun import retro as R
+from idun import _cli_retro as UI
 
 # VERSION is imported, never copied: a hardcoded literal here read "0.2.6" while
 # the package was 1.0.22, so `idun-multi --version` and `idun-multi doctor` both
@@ -403,14 +404,84 @@ def cmd_doctor(_args) -> int:
 
 
 def cmd_wizard(args) -> int:
-    """`idun-multi wizard` — delegates to the unified idun-wizard (Teil D).
+    """`idun-multi wizard` — first-run setup for the LLM providers.
 
-    The unified wizard (idun_cli.run_idun_wizard) is the single writer of
-    first-run config: it writes only [defaults] provider to config.toml.
-    This command no longer writes ~/.idunrc (the old conflict source).
+    Lets the user pick one of the 17 registered providers (registry-driven),
+    optionally stores its credential via getpass, and writes
+    `[defaults] provider = <id>` to ~/.idun/config.toml. This is the ONLY
+    writer of the provider default for idun-multi.
+
+    Intentionally SEPARATE from `idun wizard`, which configures the Azure
+    Foundry client. Both write only to config.toml (never ~/.idunrc), so there
+    is no cross-file conflict — but they manage different sections.
     """
-    from idun_cli import run_idun_wizard
-    return run_idun_wizard(args)
+    if not sys.stdin.isatty():
+        UI.err(
+            "`idun-multi wizard` needs an interactive TTY. Run it in a real "
+            "terminal, or set the provider via `idun-multi login --provider X` "
+            "/ environment vars (IDUN_PROVIDER)."
+        )
+        return 1
+
+    from idun import config as C
+    from idun.providers import REGISTRY, get_provider, save_credential, credential_status
+
+    provs = list(REGISTRY)
+    # Build and PRINT the provider table so the user can actually choose.
+    rows = [(str(i + 1), p.id, p.label, "free" if p.free_tier else "paid")
+            for i, p in enumerate(provs)]
+    UI.wizard_intro([
+        "This sets up the multi-provider LLM console (idun-multi).",
+    ])
+    try:
+        print(R.table(rows, headers=("n", "provider-id", "name", "tier")))
+    except Exception:
+        # fallback: plain listing
+        for n, pid, label, tier in rows:
+            print(f"  {n}) {pid:12} {label} ({tier})")
+    print("  s) skip — keep current default")
+    print("  q) quit — exit without changing anything")
+
+    def _read(prompt: str) -> str:
+        try:
+            return input(prompt).strip()
+        except (EOFError, KeyboardInterrupt):
+            return "q"
+
+    choice = _read(f"Select provider [1-{len(provs)}, s=skip, q=quit]: ").lower()
+    if choice in ("q", "quit", ""):
+        UI.info("Wizard aborted — no changes made.")
+        return 0
+    if choice in ("s", "skip"):
+        UI.info("Skipping provider setup; keeping current default.")
+        return 0
+
+    try:
+        idx = int(choice) - 1
+        if not 0 <= idx < len(provs):
+            raise ValueError
+    except ValueError:
+        UI.err("Invalid selection.")
+        return 2
+
+    p = provs[idx]
+    UI.info(f"selected {p.id}")
+
+    if p.needs_key and credential_status(p) == "none":
+        import getpass
+        try:
+            tok = getpass.getpass(f"  {p.env_key}: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            tok = ""
+        if tok:
+            save_credential(p, tok)
+            UI.ok("credential stored (0600).")
+        else:
+            UI.info("no key stored — set it later via `idun-multi login`.")
+
+    C.write_config({"defaults": {"provider": p.id}})
+    UI.ok(f"wrote default provider '{p.id}' to {C.CONFIG_PATH}")
+    return 0
 
 def cmd_shell(args) -> int:
     """Interactive multi-turn REPL.
