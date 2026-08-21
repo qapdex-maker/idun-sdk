@@ -1,0 +1,5 @@
+Docs: drop stale "unified wizard" reference in hf_pipeline comment
+
+The unified wizard no longer exists (idun wizard = Azure, idun-multi wizard =
+LLM provider, separate). Comment now reflects that both wizards write their own
+config sections. No code change.

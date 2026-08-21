@@ -45,7 +45,8 @@ def load_hf_token() -> str:
     """HF token from env or the idun token store.
 
     Order: HF_TOKEN / HUGGING_FACE_HUB_TOKEN env, then ~/.idun/hf.token (the
-    file written by `idun-multi login --backend hf` and the unified wizard).
+    file written by `idun-multi login --backend hf` (and `idun wizard` /
+    `idun-multi wizard` write their own config sections).
     Kept stdlib-only; falls back to the legacy ~/hf_token.txt if present.
     """
     env = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
