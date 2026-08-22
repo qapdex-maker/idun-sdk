@@ -47,12 +47,6 @@ This package ships **two** command-line tools with distinct purposes. They are
     the 17 registered providers, and **prints the provider table** so you can
     choose) in `~/.idun/config.toml`.
 
-The two wizards were previously unified, but that version was broken (the
-provider table was never printed) and was corrected back into two separate
-wizards. **Both wizards write only to `~/.idun/config.toml`** (never `~/.idunrc`,
-which is no longer used). Credentials live in per-provider `~/.idun/<id>.token`
-files (0600).
-
 ```text
 idun-multi providers        # list providers + credential status
 idun-multi -p openrouter ask "hello"   # -p goes BEFORE the subcommand
