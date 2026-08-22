@@ -700,6 +700,19 @@ def _call_cloudflare(p: Provider, prompt: str, model: str, token: str, *,
     difference is authentication: the gateway expects ``cf-aig-authorization``
     (not the standard ``Authorization`` header). See ~/cloudflare.txt.
     """
+    base = p.resolved_base()
+    # The registry default is a tenant-agnostic placeholder
+    # (https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat). Until
+    # the user points IDUN_CFAIG_BASE at their real gateway, fail loudly
+    # instead of sending a request that Cloudflare rejects with a cryptic
+    # 403 / error 1010.
+    if "<" in base:
+        raise RuntimeError(
+            f"{p.id}: IDUN_CFAIG_BASE is not configured (still contains "
+            f"placeholders). Set it to your gateway URL, e.g.\n"
+            f"  export IDUN_CFAIG_BASE="
+            f"'https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat'"
+        )
     messages = _build_messages(system, prompt, history, images=images)
     headers = {"Content-Type": "application/json"}
     if token:
@@ -710,7 +723,7 @@ def _call_cloudflare(p: Provider, prompt: str, model: str, token: str, *,
         body["tools"] = tools
         if tool_choice is not None:
             body["tool_choice"] = tool_choice
-    return _post_json(f"{p.resolved_base().rstrip('/')}/chat/completions",
+    return _post_json(f"{base.rstrip('/')}/chat/completions",
                       body, headers, timeout)
 
 
