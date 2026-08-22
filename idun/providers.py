@@ -328,25 +328,6 @@ REGISTRY: tuple[Provider, ...] = (
         ),
         notes="OpenAI-compatible; broad open-model catalogue.",
     ),
-    Provider(
-        id="cfaig",
-        label="Cloudflare AI Gateway",
-        # Generische Gateway-Basis (tenant-agnostic, wie Azure). Setze deine
-        # account+gateway Route via IDUN_CFAIG_BASE, z.B.
-        # https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat
-        base="https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat",
-        default_model="dynamic/auto",
-        env_keys=("CF_AIG_TOKEN",),
-        models=("dynamic/auto",),
-        notes=(
-            "Cloudflare AI Gateway 'compat' route (OpenAI-shaped body). "
-            "Auth via cf-aig-authorization header (not Authorization). "
-            "Set CF_AIG_TOKEN or ~/.idun/cfaig.token; configure the "
-            "account/gateway path via IDUN_CFAIG_BASE. The gateway can route "
-            "to any model via the 'dynamic/<slug>' form."
-        ),
-        transport="cloudflare",
-    ),
 )
 
 _BY_ID = {p.id: p for p in REGISTRY}
@@ -686,47 +667,6 @@ def _call_openai(p: Provider, prompt: str, model: str, token: str, *,
                       body, headers, timeout)
 
 
-def _call_cloudflare(p: Provider, prompt: str, model: str, token: str, *,
-                     system: str = "", temperature: float = 0.7,
-                     max_tokens: int = 1024, timeout: int = 120,
-                     history: list[dict] | None = None,
-                     images: list[str] | None = None,
-                     tools: list[dict] | None = None,
-                     tool_choice: str | dict | None = None) -> dict:
-    """Cloudflare AI Gateway "compat" transport.
-
-    The gateway exposes an OpenAI-shaped ``/chat/completions`` route, so the
-    request/response body is identical to the openai transport. The only
-    difference is authentication: the gateway expects ``cf-aig-authorization``
-    (not the standard ``Authorization`` header). See ~/cloudflare.txt.
-    """
-    base = p.resolved_base()
-    # The registry default is a tenant-agnostic placeholder
-    # (https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat). Until
-    # the user points IDUN_CFAIG_BASE at their real gateway, fail loudly
-    # instead of sending a request that Cloudflare rejects with a cryptic
-    # 403 / error 1010.
-    if "<" in base:
-        raise RuntimeError(
-            f"{p.id}: IDUN_CFAIG_BASE is not configured (still contains "
-            f"placeholders). Set it to your gateway URL, e.g.\n"
-            f"  export IDUN_CFAIG_BASE="
-            f"'https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat'"
-        )
-    messages = _build_messages(system, prompt, history, images=images)
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["cf-aig-authorization"] = f"Bearer {token}"
-    body = {"model": model, "messages": messages,
-            "max_tokens": max_tokens, "temperature": temperature}
-    if tools:
-        body["tools"] = tools
-        if tool_choice is not None:
-            body["tool_choice"] = tool_choice
-    return _post_json(f"{base.rstrip('/')}/chat/completions",
-                      body, headers, timeout)
-
-
 def _stream_openai(p: Provider, model: str, token: str, messages: list[dict],
                    temperature: float, max_tokens: int, timeout: int):
     """Stream a chat completion over SSE, yielding text deltas.
@@ -1030,7 +970,6 @@ _TRANSPORTS = {
     "openai": _call_openai,
     "anthropic": _call_anthropic,
     "hf": _call_hf,
-    "cloudflare": _call_cloudflare,
 }
 
 
@@ -1346,10 +1285,10 @@ __all__ = [
 # trace is surfaced separately via `IdunClient` (client.py), not via
 # `complete()`. "json_mode" follows the same rule as `cmd_schema` (openai +
 # azure transports send response_format).
-_SUPPORT_STREAMING = {"openai", "azure", "cloudflare"}  # True SSE / single-chunk-yield
-_SUPPORT_JSONMODE = {"openai", "azure", "cloudflare"}     # response_format accepted
-_SUPPORT_TOOLS = {"openai", "anthropic", "cloudflare"}     # function calling via complete()
-_SUPPORT_VISION = {"openai", "anthropic", "cloudflare"}    # multimodal content blocks
+_SUPPORT_STREAMING = {"openai", "azure"}        # True SSE / single-chunk-yield
+_SUPPORT_JSONMODE = {"openai", "azure"}         # response_format accepted
+_SUPPORT_TOOLS = {"openai", "anthropic"}         # function calling via complete()
+_SUPPORT_VISION = {"openai", "anthropic"}        # multimodal content blocks
 
 
 def support_matrix() -> list[dict]:

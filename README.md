@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-≥3.8-blue?logo=python&logoColor=white)](https://pypi.org/project/idun-sdk/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Offline tests](https://img.shields.io/badge/tests-291%20passing-brightgreen.svg)](https://github.com/qapdex-maker/idun-sdk/actions)
-[![Providers](https://img.shields.io/badge/providers-18-blue.svg)](https://github.com/qapdex-maker/idun-sdk/blob/main/SUPPORT_MATRIX.md)
+[![Providers](https://img.shields.io/badge/providers-17-blue.svg)](https://github.com/qapdex-maker/idun-sdk/blob/main/SUPPORT_MATRIX.md)
 [![CI](https://github.com/qapdex-maker/idun-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/qapdex-maker/idun-sdk/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-GitMCP-blue.svg)](https://gitmcp.io/qapdex-maker/idun-sdk)
 [![GitHub](https://img.shields.io/badge/source-qapdex--maker%2Fidun--sdk-black?logo=github)](https://github.com/qapdex-maker/idun-sdk)
@@ -45,11 +45,11 @@ This package ships **two** command-line tools with distinct purposes. They are
   `idun packs`), and Hugging Face Hub operations (`idun hf`). Azure-specific.
   - `idun wizard` configures the **Azure Foundry client** (endpoint /
     project / agent) in `~/.idun/config.toml`.
-- **`idun-multi`** — the multi-provider LLM console. Talks to any of the 18
-  registered providers (OpenAI, Anthropic, Groq, OpenRouter, HF, Cloudflare AI
-  Gateway, …) plus `race`, `cost`, `models`, `doctor`, `support`. Provider-agnostic.
+- **`idun-multi`** — the multi-provider LLM console. Talks to any of the 17
+  registered providers (OpenAI, Anthropic, Groq, OpenRouter, HF, …) plus
+  `race`, `cost`, `models`, `doctor`, `support`. Provider-agnostic.
   - `idun-multi wizard` configures the **default LLM provider** (picks one of
-    the 18 registered providers and prints the provider table so you can
+    the 17 registered providers and prints the provider table so you can
     choose) in `~/.idun/config.toml`.
 
 **Both wizards write only to `~/.idun/config.toml`** (never `~/.idunrc`,
@@ -122,8 +122,6 @@ native Azure AI Foundry transport. Registered providers (4 groups):
 - **OpenAI-compatible:** `openai`, `groq`, `together`, `perplexity`, `fireworks`,
   `novita`, `xai`, `deepseek`, `mistral`, `openrouter`, `gemini`, `hf`, `nous`
 - **Anthropic:** `anthropic` (Claude)
-- **Cloudflare:** `cfaig` (Cloudflare AI Gateway — OpenAI-compatible "compat"
-  route, auth via `cf-aig-authorization` header)
 - **Azure:** `azure` (Azure AI Foundry / Idun agent)
 - **Local:** `ollama`, `local` (bring your own endpoint)
 
