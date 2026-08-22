@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Idun SDK — Completion API",
-    "version": "1.0.29",
+    "version": "1.0.30",
     "description": "OpenAPI description of the Idun SDK completion surface. Idun is a stdlib-only client + CLI for the NatureLM-Idun-5-MoE agent on Azure AI Foundry, with a pluggable multi-backend layer (azure / hf / openai). The chat completion shape mirrors the OpenAI /v1/chat/completions request/response so Idun can be driven by any OpenAI-compatible client or OpenAPI tool.",
     "license": {
       "name": "MIT"

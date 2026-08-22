@@ -15,11 +15,13 @@ def test_matrix_covers_every_provider():
 
 
 def test_matrix_json_mode_matches_schema_rule():
-    """`json_mode` in the matrix must equal the openai/azure transport rule
-    used by cmd_schema (`p.transport in ('openai', 'azure')`)."""
+    """`json_mode` in the matrix must equal the transport rule used by
+    cmd_schema (`p.transport in ('openai', 'azure', 'cloudflare')`). The
+    cloudflare 'compat' route is OpenAI-shaped, so it accepts response_format
+    just like the openai transport."""
     for r in support_matrix():
         p = get_provider(r["id"])
-        expected = p.transport in ("openai", "azure")
+        expected = p.transport in ("openai", "azure", "cloudflare")
         assert r["json_mode"] is expected, \
             f"{r['id']}: json_mode {r['json_mode']} != transport rule {expected}"
 

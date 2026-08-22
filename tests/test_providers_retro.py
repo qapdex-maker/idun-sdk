@@ -27,7 +27,7 @@ def test_every_provider_has_base_and_model():
     for p in P.list_providers():
         assert p.base.startswith("http"), p.id
         assert p.default_model, p.id
-        assert p.transport in ("openai", "anthropic", "hf", "azure"), p.id
+        assert p.transport in ("openai", "anthropic", "hf", "azure", "cloudflare"), p.id
 
 
 def test_get_provider_is_case_insensitive():

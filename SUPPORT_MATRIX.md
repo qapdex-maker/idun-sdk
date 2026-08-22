@@ -21,6 +21,7 @@ Per-provider capability matrix. **Generated from the transports actually impleme
 | `perplexity` | openai | ✓ | ✓ | ✓ | ✓ |
 | `fireworks` | openai | ✓ | ✓ | ✓ | ✓ |
 | `novita` | openai | ✓ | ✓ | ✓ | ✓ |
+| `cfaig` | cloudflare | ✓ | ✓ | ✓ | ✓ |
 
 ## What the columns mean
 
