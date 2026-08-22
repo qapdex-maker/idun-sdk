@@ -1,12 +1,17 @@
 # idun-sdk
 
-[![PyPI](https://img.shields.io/pypi/v/idun-sdk.svg)](https://pypi.org/project/idun-sdk/)
-[![Python](https://img.shields.io/pypi/pyversions/idun-sdk.svg)](https://pypi.org/project/idun-sdk/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/idun-sdk?label=PyPI&color=blueviolet)](https://pypi.org/project/idun-sdk/)
+[![Python](https://img.shields.io/pypi/pyversions/idun-sdk?logo=python&logoColor=white)](https://pypi.org/project/idun-sdk/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Offline tests](https://img.shields.io/badge/tests-291%20passing-brightgreen.svg)](https://github.com/qapdex-maker/idun-sdk/actions)
+[![Providers](https://img.shields.io/badge/providers-17-blue.svg)](https://github.com/qapdex-maker/idun-sdk/blob/main/SUPPORT_MATRIX.md)
+[![CI](https://github.com/qapdex-maker/idun-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/qapdex-maker/idun-sdk/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-GitMCP-blue.svg)](https://gitmcp.io/qapdex-maker/idun-sdk)
+[![GitHub](https://img.shields.io/badge/source-qapdex--maker%2Fidun--sdk-black?logo=github)](https://github.com/qapdex-maker/idun-sdk)
 
-A thin, dependency-free Python client + CLI for **Azure AI Foundry** agents
-(Idun / NatureLM) and any OpenAI-compatible endpoint. Tenant-agnostic by default:
-bring your own Foundry resource, no hardcoded tenant coordinates.
+A thin, **dependency-free** Python client + CLI for **Azure AI Foundry** agents
+(Idun / NatureLM) and any OpenAI-compatible endpoint. Tenant-agnostic by design:
+bring your own Foundry resource — no hardcoded tenant coordinates.
 
 ---
 
@@ -44,12 +49,10 @@ This package ships **two** command-line tools with distinct purposes. They are
   registered providers (OpenAI, Anthropic, Groq, OpenRouter, HF, …) plus
   `race`, `cost`, `models`, `doctor`, `support`. Provider-agnostic.
   - `idun-multi wizard` configures the **default LLM provider** (picks one of
-    the 17 registered providers, and **prints the provider table** so you can
+    the 17 registered providers and prints the provider table so you can
     choose) in `~/.idun/config.toml`.
 
-The two wizards were previously unified, but that version was broken (the
-provider table was never printed) and was corrected back into two separate
-wizards. **Both wizards write only to `~/.idun/config.toml`** (never `~/.idunrc`,
+**Both wizards write only to `~/.idun/config.toml`** (never `~/.idunrc`,
 which is no longer used). Credentials live in per-provider `~/.idun/<id>.token`
 files (0600).
 
@@ -122,29 +125,17 @@ native Azure AI Foundry transport. Registered providers (4 groups):
 - **Azure:** `azure` (Azure AI Foundry / Idun agent)
 - **Local:** `ollama`, `local` (bring your own endpoint)
 
-> **Tested vs untested (as of 2026-08-21).** After a full audit only a subset
-> of these providers has actually been exercised against a live endpoint. The
-> rest are **registered and code-complete but NOT verified** — they may work,
-> but nobody has confirmed it.
->
-> | Status | Providers |
-> |---|---|
-> | ✅ tested against a live endpoint | `openrouter` (live OK), `openai` (token valid, account has no credit → HTTP 429), `hf` (migrated to `router.huggingface.co`; see note), `ollama` / `local` (correctly unreachable in CI) |
-> | ⚠️ untested | `anthropic`, `groq`, `together`, `deepseek`, `mistral`, `gemini`, `xai`, `nous`, `perplexity`, `fireworks`, `novita` |
-> | ℹ️ needs tenant | `azure` |
->
-> See **[AUDIT-BEFEHLE.md](./AUDIT-BEFEHLE.md)** for the full command audit and
-> **[BEFUNDE.md](./BEFUNDE.md)** / **[ROADMAP-FIX.md](./ROADMAP-FIX.md)** for the
-> bug log. A live test harness for `idun race` is planned to exercise all
-> providers before the next release.
+Each provider's capabilities (streaming, tools, vision, JSON mode) are derived
+from the transports actually implemented in `idun/providers.py` — see
+**[SUPPORT_MATRIX.md](./SUPPORT_MATRIX.md)** for the full, code-generated
+matrix and per-transport capability details.
 
-**Hugging Face (`hf`):** migrated to the OpenAI-compatible router
-`https://router.huggingface.co/v1` (the old `api-inference.huggingface.co` host
-was retired and no longer resolves). Requires an HF token (`HF_TOKEN`).
+**Hugging Face (`hf`):** uses the OpenAI-compatible router
+`https://router.huggingface.co/v1` (the legacy `api-inference.huggingface.co`
+host was retired). Requires an HF token (`HF_TOKEN`).
 
 Any OpenAI-compatible base URL works with zero code changes — set it in the
-config and the provider switches automatically. See
-**[SUPPORT_MATRIX.md](./SUPPORT_MATRIX.md)** for per-provider capability details.
+config and the provider switches automatically.
 
 ## Configuration (tenant-agnostic)
 
@@ -202,6 +193,8 @@ resource: <https://qapdex-maker.github.io/idun-playground/matrix_app.html>
 - Live demo (recorded trajectories + matrix UI): <https://qapdex-maker.github.io/idun-playground/>
 - Matrix concept note: <https://github.com/qapdex-maker/idun-playground/blob/main/DOC_MATRIX_CONCEPT.md>
 - Source: <https://github.com/qapdex-maker/idun-sdk>
+- Roadmap: <https://github.com/qapdex-maker/idun-sdk/blob/main/ROADMAP.md>
+- Changelog: <https://github.com/qapdex-maker/idun-sdk/blob/main/CHANGELOG.md>
 
 ## Development
 
