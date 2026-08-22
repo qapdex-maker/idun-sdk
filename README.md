@@ -1,7 +1,7 @@
 # idun-sdk
 
 [![PyPI version](https://img.shields.io/pypi/v/idun-sdk?label=PyPI&color=blueviolet)](https://pypi.org/project/idun-sdk/)
-[![Python](https://img.shields.io/pypi/pyversions/idun-sdk?logo=python&logoColor=white)](https://pypi.org/project/idun-sdk/)
+[![Python](https://img.shields.io/badge/python-≥3.8-blue?logo=python&logoColor=white)](https://pypi.org/project/idun-sdk/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Offline tests](https://img.shields.io/badge/tests-291%20passing-brightgreen.svg)](https://github.com/qapdex-maker/idun-sdk/actions)
 [![Providers](https://img.shields.io/badge/providers-17-blue.svg)](https://github.com/qapdex-maker/idun-sdk/blob/main/SUPPORT_MATRIX.md)
@@ -193,7 +193,6 @@ resource: <https://qapdex-maker.github.io/idun-playground/matrix_app.html>
 - Live demo (recorded trajectories + matrix UI): <https://qapdex-maker.github.io/idun-playground/>
 - Matrix concept note: <https://github.com/qapdex-maker/idun-playground/blob/main/DOC_MATRIX_CONCEPT.md>
 - Source: <https://github.com/qapdex-maker/idun-sdk>
-- Roadmap: <https://github.com/qapdex-maker/idun-sdk/blob/main/ROADMAP.md>
 - Changelog: <https://github.com/qapdex-maker/idun-sdk/blob/main/CHANGELOG.md>
 
 ## Development
