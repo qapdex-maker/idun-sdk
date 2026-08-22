@@ -20,6 +20,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install pytest
         run: pip install pytest
+      - name: Install package (needed so console_scripts land on PATH)
+        run: pip install .
       - name: Run offline test suite
         run: python -m pytest -q
 
