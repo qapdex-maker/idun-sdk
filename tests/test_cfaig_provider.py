@@ -3,8 +3,6 @@
 Red phase: these fail before the provider is registered. Green after the
 `cloudflare` transport + `cfaig` registry entry land in providers.py.
 """
-import pytest
-
 import idun.providers as P
 
 

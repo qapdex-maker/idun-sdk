@@ -714,7 +714,6 @@ def _call_cloudflare(p: Provider, prompt: str, model: str, token: str, *,
                       body, headers, timeout)
 
 
-
 def _stream_openai(p: Provider, model: str, token: str, messages: list[dict],
                    temperature: float, max_tokens: int, timeout: int):
     """Stream a chat completion over SSE, yielding text deltas.
