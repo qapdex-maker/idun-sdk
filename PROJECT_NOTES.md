@@ -16,16 +16,17 @@ nicht PyPI. Lokaler Klon sync (ungepusht=0).
 - HARTE REGEL (User): Push zu GitHub UND PyPI-Upload NUR auf Auftrag. PyPI NIEMALS
   allein ohne gleichzeitigen idun-sdk GitHub-Push.
 
-## Offene Punkte (aus ROADMAP.md, "Open items") — VORBEREITET 2026-08-27
+## Offene Punkte (aus ROADMAP.md, "Open items") — VORBEREITET + GEPUSHT 2026-08-27
 1. HF token live confirmation — code-path da (B7: router.huggingface.co/v1).
    `scripts/hf_live_check.py` bereit, wartet auf echten HF-Token.
-2. Provider matrix honesty — ERLEDIGT (Vorbereitung): `support_matrix()` + SUPPORT_MATRIX.md
+2. Provider matrix honesty — ERLEDIGT: `support_matrix()` + SUPPORT_MATRIX.md
    um "Live-tested" erweitert (3/17 ✓: azure/openai/anthropic, 14 untested). Nebenbefund:
    alte Matrix sagte `hf=hf transport` — im Code ist hf.transport='openai' (korrigiert).
-3. `idun race` test harness — ERLEDIGT (Vorbereitung): `scripts/race_smoke.py`, echter Run
-   CRASHES: 0 über 17 Provider (graceful ohne Keys).
+   GEPUSHT (2d3dce5).
+3. `idun race` test harness — ERLEDIGT: `scripts/race_smoke.py`, echter Run
+   CRASHES: 0 über 17 Provider (graceful ohne Keys). GEPUSHT.
 4. CodeRabbit-Alternative — `docs/code-review-options.md` bereit (Empfehlung: self-built auf
-   idun-multi). User-Entscheidung ausstehend.
+   idun-multi). User-Entscheidung ausstehend. GEPUSHT.
 Detail: ~/github/repo/idun-sdk/FAHRPLAN_OFFENE_ITEMS.md
 
 ## Bekannte behobene Bugs (aus CHANGELOG/PR-Reviews, nicht neu jagen)
