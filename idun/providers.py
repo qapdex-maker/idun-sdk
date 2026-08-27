@@ -1295,7 +1295,20 @@ def support_matrix() -> list[dict]:
     """Return the per-provider capability matrix (drives `idun-multi support`
     and the SUPPORT_MATRIX.md doc). Honest: flags come from the transports
     actually implemented in this module, not from provider marketing.
+
+    `live_tested` is a manually-maintained honesty flag: True only when a
+    provider has been exercised against a REAL endpoint with a valid key.
+    Code-complete (transport registered) != live-tested. Keeps the public
+    matrix honest about what is proven vs only wired up.
     """
+    # live_tested: gepflegt, sobald ein Provider gegen echten Endpoint getestet wurde.
+    # Default False — nur bewusst auf True setzen nach realem Live-Call.
+    _LIVE_TESTED = {
+        "azure": True,      # Azure AI Foundry Client, produktiv genutzt
+        "openai": True,     # OpenAI-Transport live verifiziert
+        "anthropic": True,  # anthropic-Transport live verifiziert
+        # rest: code-complete, aber kein dokumentierter Live-Call mit echtem Key
+    }
     rows = []
     for p in REGISTRY:
         t = p.transport
@@ -1307,6 +1320,7 @@ def support_matrix() -> list[dict]:
             "tools": t in _SUPPORT_TOOLS,
             "vision": t in _SUPPORT_VISION,
             "json_mode": t in _SUPPORT_JSONMODE,
+            "live_tested": _LIVE_TESTED.get(p.id, False),
         })
     return rows
 
@@ -1314,15 +1328,16 @@ def support_matrix() -> list[dict]:
 def support_matrix_text() -> str:
     """Render the capability matrix as a Markdown table (no secrets)."""
     rows = support_matrix()
-    head = ("| Provider | Transport | Streaming | Tools | Vision | JSON mode |\n"
-            "|---|---|---|---|---|---|")
+    head = ("| Provider | Transport | Streaming | Tools | Vision | JSON mode | Live-tested |\n"
+            "|---|---|---|---|---|---|---|")
     lines = [head]
     for r in rows:
         def _mark(b: bool) -> str:
             return "✓" if b else "—"
         lines.append(
             f"| `{r['id']}` | {r['transport']} | {_mark(r['streaming'])} | "
-            f"{_mark(r['tools'])} | {_mark(r['vision'])} | {_mark(r['json_mode'])} |"
+            f"{_mark(r['tools'])} | {_mark(r['vision'])} | {_mark(r['json_mode'])} | "
+            f"{_mark(r['live_tested'])} |"
         )
     return "\n".join(lines)
 
