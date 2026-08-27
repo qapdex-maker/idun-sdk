@@ -15,7 +15,7 @@ Per-provider capability matrix. **Generated from the transports actually impleme
 | `gemini` | openai | ✓ | ✓ | ✓ | ✓ | — |
 | `xai` | openai | ✓ | ✓ | ✓ | ✓ | — |
 | `nous` | openai | ✓ | ✓ | ✓ | ✓ | — |
-| `hf` | openai | ✓ | ✓ | ✓ | ✓ | — |
+| `hf` | openai | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `ollama` | openai | ✓ | ✓ | ✓ | ✓ | — |
 | `local` | openai | ✓ | ✓ | ✓ | ✓ | — |
 | `perplexity` | openai | ✓ | ✓ | ✓ | ✓ | — |

@@ -17,8 +17,8 @@ nicht PyPI. Lokaler Klon sync (ungepusht=0).
   allein ohne gleichzeitigen idun-sdk GitHub-Push.
 
 ## Offene Punkte (aus ROADMAP.md, "Open items") — VORBEREITET + GEPUSHT 2026-08-27
-1. HF token live confirmation — code-path da (B7: router.huggingface.co/v1).
-   `scripts/hf_live_check.py` bereit, wartet auf echten HF-Token.
+1. HF token live confirmation — ERLEDIGT (Live-Call 2026-08-27: whoami "Qapdex" + chat
+   "bereit" via router.huggingface.co/v1). `_LIVE_TESTED['hf']=True`. GEPUSHT.
 2. Provider matrix honesty — ERLEDIGT: `support_matrix()` + SUPPORT_MATRIX.md
    um "Live-tested" erweitert (3/17 ✓: azure/openai/anthropic, 14 untested). Nebenbefund:
    alte Matrix sagte `hf=hf transport` — im Code ist hf.transport='openai' (korrigiert).

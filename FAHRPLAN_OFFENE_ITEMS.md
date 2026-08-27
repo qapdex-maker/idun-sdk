@@ -7,14 +7,12 @@ Quelle der Fakten: echte Code-Reads (idun/providers.py, idun/hf_pipeline.py,
 SUPPORT_MATRIX.md, pytest exit 0).
 
 ## Item 1 — HF token live confirmation (ROADMAP Open #1)
-Status: code-path verifiziert (B7). `router.huggingface.co/v1` in providers.py:267
-+ hf_pipeline.py:29. Tests test_hf_endpoint.py existiert.
-VORBEREITUNG (ohne Token machbar):
+Status: LIVE BESTÄTIGT 2026-08-27. Echter Call via scripts/hf_live_check.py:
+  whoami OK ("Qapdex"), chat OK ("bereit", DeepSeek-V4-Flash via router.huggingface.co/v1).
 - [x] Code-Path geprüft: HF_INFERENCE = router.huggingface.co/v1, chat/completions.
-- [x] `scripts/hf_live_check.py` geschrieben: liest HF_TOKEN, ruft `idun hf chat` +
-      `hf_whoami` aus, prüft Antwort != auth-error. WARTET auf echten Token.
-- [ ] Wenn Token da: Skript ausführen, Ergebnis in PROJECT_NOTES vermerken,
-      ROADMAP-Item 1 auf "erledigt" setzen, `_LIVE_TESTED['hf']=True` in providers.py.
+- [x] `scripts/hf_live_check.py` geschrieben + mit echtem Token ausgeführt.
+- [x] `_LIVE_TESTED['hf']=True` in providers.py + SUPPORT_MATRIX.md hf-Zeile ✓.
+  ERLEDIGT.
 
 ## Item 2 — Provider matrix honesty (ROADMAP Open #2)
 Status: SUPPORT_MATRIX.md wurde aus support_matrix() generiert (code-path).
@@ -45,7 +43,7 @@ VORBEREITUNG:
 ## Reihenfolge (bis IGNITE)
 1. Item 2 (Matrix honesty) — ERLEDIGT (Vorbereitung), wartet nur auf Live-Flips.
 2. Item 3 (race smoke) — ERLEDIGT (Vorbereitung), CRASHES:0 bewiesen.
-3. Item 1 (HF live) — Skript bereit, wartet auf Token.
+3. Item 1 (HF live) — ERLEDIGT (Live-Call 2026-08-27, whoami+chat OK, _LIVE_TESTED['hf']=True).
 4. Item 4 (Review-Optionen) — Doc bereit, User-Entscheidung nötig.
 
 ## Harte Regeln

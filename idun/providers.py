@@ -1307,6 +1307,7 @@ def support_matrix() -> list[dict]:
         "azure": True,      # Azure AI Foundry Client, produktiv genutzt
         "openai": True,     # OpenAI-Transport live verifiziert
         "anthropic": True,  # anthropic-Transport live verifiziert
+        "hf": True,         # Live bestätigt 2026-08-27 (whoami + chat OK via router.huggingface.co/v1)
         # rest: code-complete, aber kein dokumentierter Live-Call mit echtem Key
     }
     rows = []
