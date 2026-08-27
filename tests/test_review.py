@@ -4,9 +4,6 @@ These run fully offline: they never call an LLM or GitHub. They cover the
 review-text parser, severity->label mapping, and the chunk cache round-trip.
 """
 
-import json
-import os
-
 import idun.review_parse as RP
 from idun import review_cache as RC
 
