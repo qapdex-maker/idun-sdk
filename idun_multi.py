@@ -299,6 +299,110 @@ def cmd_race(args) -> int:
     return 0
 
 
+def _review_providers() -> list[str]:
+    """Provider mit Credential, die zum Review genutzt werden (Ensemble)."""
+    wanted = ["anthropic", "hf", "deepseek", "openai", "gemini", "mistral"]
+    pids = []
+    for pid in wanted:
+        p = P.get_provider(pid)
+        if p and P.credential_status(p) not in ("none",):
+            pids.append(pid)
+    # fallback: alle mit credential
+    if not pids:
+        pids = [p.id for p in P.list_providers()
+                if P.credential_status(p) not in ("none",) and p.transport != "azure"]
+    return pids[:3]  # max 3 contenders
+
+
+def cmd_review(args) -> int:
+    """Self-built PR reviewer: diff -> race over providers -> post PR comment.
+
+    MVP (ROADMAP Open #4, self-built decision 2026-08-27). Uses idun-multi's
+    existing LLM engine + providers; posts a merged review as a PR comment.
+    """
+    import subprocess
+
+    pr = args.pr
+    repo = args.repo or "qapdex-maker/idun-sdk"
+    # pr kann "#123", "123", "owner/repo#123" oder "https://.../pull/123" sein
+    gh_repo = repo
+    gh_pr = pr
+    if "#" in pr and "/" in pr:
+        gh_repo, _, num = pr.partition("#")
+        gh_pr = num
+    elif pr.startswith("http"):
+        # https://github.com/owner/repo/pull/123
+        import re
+        m = re.search(r"github\.com/([^/]+/[^/]+)/pull/(\d+)", pr)
+        if m:
+            gh_repo, gh_pr = m.group(1), m.group(2)
+    elif pr.isdigit() or (pr.startswith("#") and pr[1:].isdigit()):
+        gh_pr = pr.lstrip("#")
+
+    print(R.header("IDUN REVIEW", f"{gh_repo}#{gh_pr}"))
+    # 1) diff holen
+    try:
+        diff = subprocess.run(
+            ["gh", "pr", "diff", gh_pr, "--repo", gh_repo],
+            capture_output=True, text=True, timeout=120
+        ).stdout
+    except FileNotFoundError:
+        print(R.status("err", "gh CLI nicht gefunden."))
+        return 1
+    if not diff.strip():
+        print(R.status("warn", "leerer diff — PR nicht gefunden oder kein Zugriff."))
+        return 1
+    print(R.status("info", f"diff: {len(diff)} bytes"))
+
+    # 2) diff in chunks splitten (Modell-Kontext)
+    max_chunk = 6000
+    chunks = [diff[i:i + max_chunk] for i in range(0, len(diff), max_chunk)] or [diff]
+    print(R.status("info", f"{len(chunks)} chunk(s) zum Review"))
+
+    pids = _review_providers()
+    if not pids:
+        print(R.status("err", "keine Provider mit Credential. `idun-multi login`."))
+        return 1
+    print(R.status("info", f"Ensemble: {', '.join(pids)}"))
+
+    review_prompt = (
+        "Du bist ein strenger Code-Reviewer. Finde nur echte Probleme: Bugs, "
+        "Security-Issues (Token-Leaks, Path-Traversal), Crashes, Dead-Code, "
+        "Regressionen. Ignoriere Style. Antworte kompakt, eine Zeile pro Fund, "
+        "mit Datei:Zeile falls erkennbar. Wenn sauber: 'KEINE FUNDE'."
+    )
+
+    comments = []
+    for idx, chunk in enumerate(chunks, 1):
+        full = f"{review_prompt}\n\n--- DIFF CHUNK {idx}/{len(chunks)} ---\n{chunk}"
+        lines = []
+        for pid in pids:
+            try:
+                res = P.complete(pid, full, max_tokens=600, timeout=150)
+                lines.append(f"[{pid}] {res.text.strip()}")
+            except (RuntimeError, ValueError) as e:
+                lines.append(f"[{pid}] ERROR: {e}")
+        comments.append("\n".join(lines))
+
+    body = "## 🤖 idun-multi self-built review\n\n" + "\n\n---\n\n".join(comments)
+    print()
+    print(R.header("REVIEW (lokal)", f"{len(comments)} chunk(s)"))
+    print(body[:2000])
+
+    # 3) als PR-Comment posten
+    if args.post:
+        try:
+            subprocess.run(["gh", "pr", "comment", gh_pr, "--repo", gh_repo,
+                            "--body", body], check=True, timeout=60)
+            print(R.status("ok", "als PR-Comment gepostet."))
+        except subprocess.CalledProcessError as e:
+            print(R.status("err", f"Post fehlgeschlagen: {e}"))
+            return 1
+    else:
+        print(R.status("info", "Trockenlauf (--post zum Veröffentlichen)."))
+    return 0
+
+
 def cmd_cost(_args) -> int:
     """Print the approximate per-1K-token list-price table."""
     from idun.providers import cost_table
@@ -755,6 +859,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("cost", help="show the approximate list-price table")
     sp.set_defaults(func=cmd_cost)
+
+    sp = sub.add_parser("review", help="self-built PR reviewer (diff -> race -> comment)")
+    sp.add_argument("pr", help="PR id (#123) or owner/repo#123")
+    sp.add_argument("--repo", default="qapdex-maker/idun-sdk",
+                    help="default repo if pr is just #num")
+    sp.add_argument("--post", action="store_true",
+                    help="post the review as a PR comment (default: dry run)")
+    sp.set_defaults(func=cmd_review)
 
     sp = sub.add_parser("doctor", help="environment and credential audit")
     sp.set_defaults(func=cmd_doctor)

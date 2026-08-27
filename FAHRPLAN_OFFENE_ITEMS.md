@@ -35,10 +35,14 @@ VORBEREITUNG:
 - [ ] Bei echten Keys: echtes race über live Provider (Latenz/Cost/Priority).
 
 ## Item 4 — CodeRabbit-Alternative (ROADMAP Open #4)
-Status: recherchiert, KEINE Entscheidung.
-VORBEREITUNG:
-- [x] `docs/code-review-options.md` angelegt: Pro/Contra je Option + Empfehlung
-      (self-built CLI auf idun-multi-Basis). User-Entscheidung ausstehend.
+Status: ENTSCHEIDEN (2026-08-27): **self-built**. MVP gebaut: `idun-multi review <pr>`
+(cmd_review in idun_multi.py). Trockenlauf gegen dotnet/skills#1036 bewiesen (hf
+"KEINE FUNDE", openai 429 graceful als ERROR). GEPUSHT.
+VORBEREITUNG (erledigt):
+- [x] `docs/code-review-options.md` angelegt: Pro/Contra + detaillierter Vergleich
+      self-built vs Qodo. Empfehlung self-built.
+- [x] MVP `idun-multi review <pr>` implementiert (diff → race → optional gh comment).
+Solide-Stufe (offen): severity-Labels, inline-Kommentare via gh API, caching.
 
 ## Reihenfolge (bis IGNITE)
 1. Item 2 (Matrix honesty) — ERLEDIGT (Vorbereitung), wartet nur auf Live-Flips.

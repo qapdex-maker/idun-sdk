@@ -25,8 +25,9 @@ nicht PyPI. Lokaler Klon sync (ungepusht=0).
    GEPUSHT (2d3dce5).
 3. `idun race` test harness — ERLEDIGT: `scripts/race_smoke.py`, echter Run
    CRASHES: 0 über 17 Provider (graceful ohne Keys). GEPUSHT.
-4. CodeRabbit-Alternative — `docs/code-review-options.md` bereit (Empfehlung: self-built auf
-   idun-multi). User-Entscheidung ausstehend. GEPUSHT.
+4. CodeRabbit-Alternative — ENTSCHEIDUNG: self-built. `idun-multi review <pr>` MVP
+   gebaut (cmd_review). Trockenlauf gegen dotnet/skills#1036 bewiesen (hf "KEINE
+   FUNDE", openai 429 graceful). GEPUSHT. Solide-Stufe offen (labels/inline/cache).
 Detail: ~/github/repo/idun-sdk/FAHRPLAN_OFFENE_ITEMS.md
 
 ## Bekannte behobene Bugs (aus CHANGELOG/PR-Reviews, nicht neu jagen)
