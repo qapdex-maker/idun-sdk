@@ -169,6 +169,7 @@ REGISTRY: tuple[Provider, ...] = (
         models=("model-router",),
         notes="Set IDUN_BASE + IDUN_PROJECT; Entra device-code via `idun login`.",
         transport="azure",
+        verified=True,  # Azure AI Foundry client, used in production
     ),
     Provider(
         id="openai",
@@ -189,6 +190,7 @@ REGISTRY: tuple[Provider, ...] = (
                 "claude-3-5-haiku-20241022"),
         notes="Native messages API (x-api-key + anthropic-version).",
         transport="anthropic",
+        verified=True,  # anthropic transport live-verified
     ),
     Provider(
         id="groq",

@@ -3,10 +3,10 @@
 Per-provider capability matrix. **Generated from the transports actually implemented in `idun/providers.py`** (via `idun.providers.support_matrix()`), so this never drifts from the code. Re-render with `idun-multi support`.
 
 | Provider | Transport | Streaming | Tools | Vision | JSON mode | Declared | Live |\n|---|---|---|---|---|---|---|---|
-| `azure` | azure | ✓ | — | — | ✓ | — | ? |
+| `azure` | azure | ✓ | — | — | ✓ | ✓ | ? |
 | `openai` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ? |
-| `anthropic` | anthropic | — | ✓ | ✓ | — | — | ? |
-| `groq` | openai | ✓ | ✓ | ✓ | ✓ | — | ✓ live |
+| `anthropic` | anthropic | — | ✓ | ✓ | — | ✓ | ? |
+| `groq` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
 | `openrouter` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ? |
 | `together` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
 | `deepseek` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
