@@ -102,6 +102,13 @@ class Provider:
     # transport: "openai" (chat/completions) / "anthropic" / "hf". Custom
     # transports register in _TRANSPORTS instead of via this field.
     transport: str = "openai"
+    # ``verified`` is the *declared* state in the registry (i.e. the maintainer
+    # has smoke-tested this provider at least once and it worked). It is only a
+    # default — the live "have we actually called this provider lately?" state
+    # lives in the on-disk verification log (see verification.py) and is what
+    # `support` / `verify` surface. A provider with ``verified=False`` is not
+    # necessarily broken; it simply has never been proven to work end-to-end.
+    verified: bool = False
 
     # ---- credential storage -------------------------------------------
     @property
@@ -170,6 +177,7 @@ REGISTRY: tuple[Provider, ...] = (
         default_model="gpt-4o-mini",
         env_keys=("OPENAI_API_KEY", "OPENAI_TOKEN"),
         models=("gpt-4o-mini", "gpt-4o", "gpt-4.1", "o4-mini"),
+        verified=True,  # reference transport; smoke-tested repeatedly
     ),
     Provider(
         id="anthropic",
@@ -201,6 +209,7 @@ REGISTRY: tuple[Provider, ...] = (
         models=("meta-llama/llama-3.3-70b-instruct",
                 "deepseek/deepseek-chat", "anthropic/claude-sonnet-4"),
         free_tier=True,
+        verified=True,  # live openrouter OK confirmed on real device
     ),
     Provider(
         id="together",
@@ -272,6 +281,7 @@ REGISTRY: tuple[Provider, ...] = (
         needs_key=True,
         notes="OpenAI-compatible router; needs an HF token (HF_TOKEN).",
         transport="openai",
+        verified=True,  # live OK over router confirmed on real device
     ),
     Provider(
         id="ollama",
@@ -1295,10 +1305,22 @@ def support_matrix() -> list[dict]:
     """Return the per-provider capability matrix (drives `idun-multi support`
     and the SUPPORT_MATRIX.md doc). Honest: flags come from the transports
     actually implemented in this module, not from provider marketing.
+
+    The ``verified`` column is **two** facts:
+      * ``declared``  — the registry maintainer has smoke-tested this provider
+        at least once and recorded it as working (``Provider.verified``).
+      * ``live``      — our most recent actual API call to this provider
+        succeeded. Comes from the on-disk verification log
+        (``idun.verification``), which ``idun-multi verify`` / ``race`` write.
+        ``unknown`` means we have never actually called it from this machine.
+    A provider that is ``declared`` but ``live=unknown`` is not claimed to
+    work — it is simply unproven on this install.
     """
+    from . import verification as V
     rows = []
     for p in REGISTRY:
         t = p.transport
+        rec = V.state(p.id)
         rows.append({
             "id": p.id,
             "label": p.label,
@@ -1307,22 +1329,42 @@ def support_matrix() -> list[dict]:
             "tools": t in _SUPPORT_TOOLS,
             "vision": t in _SUPPORT_VISION,
             "json_mode": t in _SUPPORT_JSONMODE,
+            "declared_verified": p.verified,
+            "live_state": rec.state,
+            "live_model": rec.model,
+            "live_ts": rec.ts,
+            "live_error": rec.error,
         })
     return rows
+
+
+def _verify_mark(rec_state: str) -> str:
+    """Render the live-verification state as a compact mark."""
+    from . import verification as V
+    return {
+        V.OK: "✓ live",
+        V.FAIL: "✗ fail",
+        V.SKIPPED: "⊘ skip",
+        V.UNKNOWN: "?",
+    }.get(rec_state, "?")
 
 
 def support_matrix_text() -> str:
     """Render the capability matrix as a Markdown table (no secrets)."""
     rows = support_matrix()
-    head = ("| Provider | Transport | Streaming | Tools | Vision | JSON mode |\n"
-            "|---|---|---|---|---|---|")
+    head = ("| Provider | Transport | Streaming | Tools | Vision | JSON mode | "
+            "Declared | Live |\\n"
+            "|---|---|---|---|---|---|---|---|")
     lines = [head]
     for r in rows:
         def _mark(b: bool) -> str:
             return "✓" if b else "—"
+        live = _verify_mark(r["live_state"])
+        declared = "✓" if r["declared_verified"] else "—"
         lines.append(
             f"| `{r['id']}` | {r['transport']} | {_mark(r['streaming'])} | "
-            f"{_mark(r['tools'])} | {_mark(r['vision'])} | {_mark(r['json_mode'])} |"
+            f"{_mark(r['tools'])} | {_mark(r['vision'])} | {_mark(r['json_mode'])} | "
+            f"{declared} | {live} |"
         )
     return "\n".join(lines)
 

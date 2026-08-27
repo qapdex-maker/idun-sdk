@@ -4,7 +4,39 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
-## [1.0.25] — 2026-08-21
+## [1.0.33] — 2026-08-27
+
+### Added: honest provider verification (capability vs. live)
+
+The support matrix was previously honest about **capability** (which transport
+is wired: streaming / tools / vision / JSON mode) but not about **whether a
+provider had actually answered a request**. 11 of 17 providers had never been
+proven to work end-to-end on a real device. This release makes that gap visible
+instead of hiding it.
+
+- New `idun-multi verify` command — performs a real, minimal API call against
+  every provider that has a credential configured and records the outcome in
+  `~/.idun/.verified.json` (no secrets: only status, model, latency, redacted
+  error). Unconfigured providers are reported as `skip`, **never** `fail`, so an
+  unconfigured machine shows an honest "not checked".
+- `Provider` registry now carries a `verified` flag = the maintainer has
+  smoke-tested this provider at least once (declared `openai`, `openrouter`,
+  `hf`). The on-disk log is the live source of truth.
+- `support_matrix()` / `idun-multi support` / `SUPPORT_MATRIX.md` now show two
+  extra columns: **Declared** (maintainer-tested) and **Live** (`✓ live` last
+  call ok / `✗ fail` last call errored / `⊘ skip` no credential / `?` never
+  called from this install).
+- `idun-multi race` now writes a live verification record per provider it
+  actually calls, so a `race` run doubles as a verification pass.
+- New `idun/verification.py` module + offline tests (no network): skip-without-
+  credential, record-ok, record-fail-with-redaction, persist-to-disk, and a
+  `race` test proving ok/fail records are written.
+
+### Tests
+- `tests/test_verification.py` (6 tests) + `tests/test_race_verify.py` (1 test),
+  all offline. Total suite now 303 passing.
+
+
 
 ### Docs / metadata
 - Added `project.urls` to pyproject.toml so PyPI shows Project Links: Source,

@@ -7,6 +7,7 @@ from .auth import login, load_token, maybe_refresh
 from .prompts import list_packs, load_pack, get_prompt, run_pack
 from . import providers, retro
 from . import keyring_store
+from . import verification
 from .providers import (Completion, Provider, complete, get_provider,
                         list_providers, support_matrix, support_matrix_text,
                         estimate_cost, cost_table)
@@ -17,7 +18,7 @@ __all__ = ["IdunClient", "IdunResult", "Step", "login", "load_token", "maybe_ref
            "providers", "retro", "keyring_store", "Provider", "Completion", "complete",
            "get_provider", "list_providers", "support_matrix", "support_matrix_text",
            "estimate_cost", "cost_table"]
-__version__ = "1.0.32"
+__version__ = "1.0.33"
 
 
 def logo_path(variant: str = "white") -> str:

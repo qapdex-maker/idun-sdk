@@ -111,7 +111,29 @@ idun-multi race "explain quantum"      # compare providers on one prompt
 idun-multi models              # list models (or --discover)
 idun-multi cost                # token / cost estimate
 idun-multi doctor              # environment + credential audit
+idun-multi verify              # LIVE smoke-test configured providers
 idun-multi wizard              # pick the default LLM provider
+```
+
+### Live provider verification (`idun-multi verify`)
+
+The support matrix is honest about **capability** (which transport is wired),
+but not about **whether a provider has actually answered a request lately**.
+`idun-multi verify` performs a real, minimal API call against every provider
+that has a credential configured, and records the outcome in
+`~/.idun/.verified.json` (no secrets — only status, model, latency, and a
+redacted error on failure). Unconfigured providers are reported as `skip`,
+**never** `fail`, so an unconfigured machine shows an honest "not checked"
+rather than a wall of false failures.
+
+The recorded state feeds the **Live** column of `idun-multi support` and is
+refreshed automatically every time you run `race` or `verify`. A provider with
+`Declared = —` and `Live = ?` is simply **unproven on this install** — not
+claimed broken, not claimed working.
+
+```text
+idun-multi verify                       # all providers with a credential
+idun-multi verify --providers openai,groq,anthropic
 ```
 
 ## Supported providers

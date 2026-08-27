@@ -8,6 +8,7 @@ Commands:
     login                store an API key for a provider (never echoed)
     ask PROMPT           send one prompt to the active/selected provider
     race PROMPT          fan the same prompt at several providers, compare
+    verify               live smoke-test configured providers (writes log)
     models               show known model ids for a provider
     doctor               environment / credential / reachability check
     wizard               interactive 16-bit setup wizard
@@ -25,6 +26,7 @@ from idun import __version__ as VERSION
 from idun import providers as P
 from idun import retro as R
 from idun import _cli_retro as UI
+from idun import verification as V
 
 # VERSION is imported, never copied: a hardcoded literal here read "0.2.6" while
 # the package was 1.0.22, so `idun-multi --version` and `idun-multi doctor` both
@@ -282,21 +284,187 @@ def cmd_race(args) -> int:
     rows = []
     for pid in pids:
         res = results.get(pid)
+        live = V.state(pid)
+        live_cell = _verify_mark_cli(live.state)
         if isinstance(res, Exception):
-            rows.append((pid, "-", "-", R.paint("FAILED", "err"), "-"))
+            rows.append((pid, "—", "—", R.paint("FAILED", "err"), "—", live_cell))
+            # a real failure during a race is a failed live check
+            if not (P.credential_status(P.get_provider(pid)) == "none" and
+                    P.get_provider(pid).needs_key):
+                V.record(pid, V.VerifyRecord(
+                    state=V.FAIL,
+                    error=P._sanitize_error_body(str(res))[:200],
+                    ts=__import__("time").time()))
         else:
             cost = P.estimate_cost(pid, res.prompt_tokens, res.completion_tokens)
             cost_s = f"${cost:.6f}" if cost is not None else "n/a"
-            rows.append((pid, f"{res.latency_ms} ms",
-                         str(res.total_tokens or "-"),
-                         R.paint("ok", "ok"), cost_s))
+            from typing import cast
+            comp = cast("P.Completion", res)
+            rows.append((pid, f"{comp.latency_ms} ms",
+                         str(comp.total_tokens or "—"),
+                         R.paint("ok", "ok"), cost_s, live_cell))
+            # a successful race leg is a successful live check
+            V.record(pid, V.VerifyRecord(
+                state=V.OK, model=comp.model,
+                ts=__import__("time").time(), latency_ms=comp.latency_ms))
     print()
-    print(R.table(rows, headers=("provider", "latency", "tokens", "state", "cost*")))
+    print(R.table(rows, headers=("provider", "latency", "tokens", "state",
+                                 "cost*", "live")))
     print()
     print(R.status("info",
                    "cost* = rough list-price estimate (USD); not a bill. "
-                   "See `idun-multi cost` for the full table."))
+                   "See `idun-multi cost` for the full table.\n"
+                   "live = last recorded verification state "
+                   "(✓ live / ✗ fail / ⊘ skip / ? unverified)."))
     return 0
+
+
+def _verify_state_mark(rec: "V.VerifyRecord") -> str:
+    return {
+        V.OK: R.paint("ok", "ok"),
+        V.FAIL: R.paint("FAIL", "err"),
+        V.SKIPPED: R.paint("skip", "warn"),
+        V.UNKNOWN: R.paint("?", "dim"),
+    }.get(rec.state, R.paint("?", "dim"))
+
+
+def _verify_mark_cli(state_str: str) -> str:
+    return {
+        V.OK: R.paint("✓ live", "ok"),
+        V.FAIL: R.paint("✗ fail", "err"),
+        V.SKIPPED: R.paint("⊘ skip", "warn"),
+        V.UNKNOWN: R.paint("? unverified", "dim"),
+    }.get(state_str, R.paint("? unverified", "dim"))
+
+
+def cmd_verify(args) -> int:
+    """Live smoke-test every configured provider and record the result.
+
+    Offline-safe: unconfigured providers are reported as ``skip`` (not
+    ``fail``). Requires network access for the actual calls; there is no mock
+    path. Results persist in ``~/.idun/.verified.json`` and feed the ``live``
+    column of `support` / `race`.
+    """
+    if args.providers:
+        ids = [x.strip() for x in args.providers.split(",") if x.strip()]
+        chosen = []
+        for pid in ids:
+            try:
+                chosen.append(P.get_provider(pid))
+            except ValueError as e:
+                print(R.status("err", str(e)))
+                return 2
+    else:
+        chosen = list(P.list_providers())
+
+    print(R.header("PROVIDER VERIFY",
+                   f"{len(chosen)} providers · live API smoke test"))
+    print(R.status("info",
+                   "unconfigured providers are skipped, not failed. "
+                   "needs network; no mock path."))
+    print()
+
+    def _on(pid, rec):
+        mark = _verify_state_mark(rec)
+        extra = ""
+        if rec.state == V.OK and rec.latency_ms is not None:
+            extra = f"{rec.latency_ms} ms · {rec.model}"
+        elif rec.state == V.FAIL and rec.error:
+            extra = rec.error
+        elif rec.state == V.SKIPPED:
+            extra = rec.error or ""
+        print(f"  {pid:12s} {mark}  {extra}")
+
+    results = V.run_checks(chosen, max_tokens=args.max_tokens,
+                           timeout=args.timeout, on_result=_on)
+    print()
+    ok = sum(1 for r in results.values() if r.state == V.OK)
+    skip = sum(1 for r in results.values() if r.state == V.SKIPPED)
+    fail = sum(1 for r in results.values() if r.state == V.FAIL)
+    print(R.status("ok" if fail == 0 else "warn",
+                   f"verify done: {ok} ok · {fail} fail · {skip} skipped "
+                   f"of {len(results)}"))
+    # Persist is handled inside run_checks; just save a fresh SUPPORT_MATRIX.
+    _regenerate_support_md()
+    return 0 if fail == 0 else 1
+
+
+def _regenerate_support_md() -> None:
+    """Re-render SUPPORT_MATRIX.md from the (now updated) support matrix.
+
+    Best-effort: if the file isn't where we expect, skip silently — the CLI
+    `support` command is the source of truth anyway.
+    """
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        # idun_multi.py lives at the repo root, so SUPPORT_MATRIX.md is beside
+        # it (not one directory up, as it would be for modules under idun/).
+        cand = os.path.join(here, "SUPPORT_MATRIX.md")
+        if not os.path.isfile(cand):
+            return
+        body = P.support_matrix_text()
+        pre = ("# Idun SDK - Support Matrix\n\n"
+               "Per-provider capability matrix. **Generated from the transports "
+               "actually implemented in `idun/providers.py`** (via "
+               "`idun.providers.support_matrix()`), so this never drifts from "
+               "the code. Re-render with `idun-multi support`.\n\n")
+        post = (
+            "\n\n## What the columns mean\n\n"
+            "- **Streaming** - true SSE token streaming (`openai` transport). "
+            "Azure answers in a single chunk via the agent client; "
+            "`anthropic`/`hf` fall back to a single-chunk yield so callers "
+            "can still iterate.\n"
+            "- **Tools** - function calling wired through "
+            "`complete(tools=[...])` for the `openai` + `anthropic` transports. "
+            "Tool calls are returned on `Completion.tool_calls` (normalized to "
+            "OpenAI shape). The Azure Foundry agent tool-trace is surfaced "
+            "separately via `IdunClient` (the `idun` CLI), not via `complete()`.\n"
+            "- **Vision** - multimodal input wired through "
+            "`complete(images=[...])` for the `openai` + `anthropic` transports "
+            "(image_url / image content blocks; local files are "
+            "base64-encoded). `hf` and the Azure `complete()` path are "
+            "text-only.\n"
+            "- **JSON mode** - `response_format` / structured output accepted. "
+            "Follows the same rule as `idun-multi schema` (`openai` + `azure` "
+            "transports). Use `--json` on any command for the normalized shape.\n"
+            "- **Declared** - the registry maintainer has smoke-tested this "
+            "provider at least once and recorded it as working.\n"
+            "- **Live** - result of the most recent actual API call from this "
+            "machine (`idun-multi verify` / `race`). `✓ live` = last call "
+            "succeeded, `✗ fail` = last call errored, `⊘ skip` = no credential "
+            "configured, `?` = never called from this install.\n\n"
+            "## Any OpenAI-compatible endpoint\n\n"
+            "Providers using the `openai` transport (groq, openrouter, together, "
+            "deepseek, mistral, gemini, xai, nous, ollama, local, perplexity, "
+            "fireworks, novita) inherit the `openai` transport's capabilities: "
+            "**streaming YES, tools YES, vision YES, JSON mode YES**. The "
+            "wizard option `5) other` and `IDUN_<ID>_BASE` let you point any "
+            "OpenAI-compatible endpoint at the same transport with zero code "
+            "changes.\n\n"
+            "## Using vision + tools from the CLI\n\n"
+            "```bash\n"
+            "idun-multi ask \"What is in this chart?\" --image ./chart.png\n"
+            "idun-multi ask \"Get the weather\" \\\n"
+            "  --tools '{\"type\":\"function\",\"function\":{\"name\":\"get_weather\","
+            "\\\"description\\\":\\\"weather\\\",\\\"parameters\\\":{\\\"type\\\":"
+            "\\\"object\\\",\\\"properties\\\":{\\\"city\\\":{\\\"type\\\":\\\"string\\\"}}}}}'\n"
+            "idun-multi ask \"Get the weather\" --tools ./tools.json   # JSON file\n"
+            "```\n\n"
+            "From Python:\n\n"
+            "```python\n"
+            "from idun.providers import complete\n"
+            "c = complete(\"groq\", \"weather?\", images=[\"https://x/cat.png\"],\n"
+            "             tools=[{\"type\": \"function\", \"function\": {\n"
+            "                 \"name\": \"get_weather\", \"parameters\": {\n"
+            "                 \"type\": \"object\", \"properties\": "
+            "{\"city\": {\"type\": \"string\"}}}}}]\n"
+            "print(c.text, c.tool_calls)\n"
+            "```\n"
+        )
+        with open(cand, "w", encoding="utf-8") as fh:
+            fh.write(pre + body + post)
+    except OSError:
+        pass
 
 
 def cmd_cost(_args) -> int:
@@ -630,8 +798,10 @@ def cmd_schema(args) -> int:
 
 def cmd_support(_args) -> int:
     """Print the per-provider capability matrix (streaming / tools / vision /
-    JSON mode). The flags are derived from the transports actually implemented
-    in the SDK, so the table never drifts from the code.
+    JSON mode / declared / live). The capability flags are derived from the
+    transports actually implemented in the SDK, so the table never drifts from
+    the code. ``live`` is the result of the most recent actual API call from
+    this machine (`idun-multi verify` / `race`); `?` means never called here.
     """
     from idun.providers import support_matrix_text
     print(R.header("IDUN SUPPORT MATRIX", "per-provider capabilities"))
@@ -644,6 +814,10 @@ def cmd_support(_args) -> int:
     print(R.paint("vision: not wired into complete() for any provider yet", "dim"))
     print(R.paint("json_mode: response_format accepted by openai + azure transports",
                   "dim"))
+    print(R.paint("declared: registry maintainer smoke-tested this provider",
+                  "dim"))
+    print(R.paint("live: ✓ live=last call ok · ✗ fail=last call errored · "
+                  "⊘ skip=no credential · ?=never called here", "dim"))
     return 0
 
 
@@ -752,6 +926,15 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--max-tokens", type=int, default=512, dest="max_tokens")
     sp.add_argument("--timeout", type=int, default=120)
     sp.set_defaults(func=cmd_race)
+
+    sp = sub.add_parser("verify",
+                        help="live smoke-test configured providers (writes "
+                             "~/.idun/.verified.json)")
+    sp.add_argument("--providers", default="",
+                    help="comma list (default: all providers)")
+    sp.add_argument("--max-tokens", type=int, default=8, dest="max_tokens")
+    sp.add_argument("--timeout", type=int, default=30)
+    sp.set_defaults(func=cmd_verify)
 
     sp = sub.add_parser("cost", help="show the approximate list-price table")
     sp.set_defaults(func=cmd_cost)
