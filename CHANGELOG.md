@@ -4,6 +4,28 @@ All notable changes to the Idun SDK are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); this project adheres
 to semantic versioning (`MAJOR.MINOR.PATCH`).
 
+## [1.0.34] — 2026-08-27
+
+### Added: Solide-Stufe for the self-built PR reviewer (`idun-multi review`)
+
+The MVP reviewer (ROADMAP Open #4, self-built decision) is promoted to the
+"Solide" tier:
+
+- **Structured findings**: provider output is parsed into `Finding` objects
+  (`idun/review_parse.py`) — severity (HIGH/MEDIUM/LOW/INFO), file, line,
+  message. Deduplicated across the ensemble.
+- **Severity labels**: `--labels` adds `BUG`/`HIGH`/`SECURITY`/`MEDIUM`/`LOW`
+  GitHub labels based on the worst finding (via `gh pr edit`).
+- **Inline comments**: `--inline` posts findings as inline PR review comments
+  via the GitHub GraphQL API (`createPullRequestReview` + per-finding
+  `addPullRequestReviewComment`, submitted as a COMMENT). Best-effort:
+  unresolvable positions are skipped, not fatal.
+- **Results cache**: chunk reviews are cached on disk
+  (`~/.idun/.review_cache.json`, no secrets/diff stored) so repeat runs skip
+  the LLM calls. Disable with `--no-cache`.
+- New modules: `idun/review_parse.py`, `idun/review_cache.py`. 12 offline
+  tests in `tests/test_review.py`.
+
 ## [1.0.33] — 2026-08-27
 
 ### Added: honest provider verification (capability vs. live)

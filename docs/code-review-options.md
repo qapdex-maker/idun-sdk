@@ -139,5 +139,8 @@ Echter Trockenlauf gegen dotnet/skills#1036: diff 26856 bytes, 5 chunks, hf lief
 "KEINE FUNDE", openai 429 (leeres Guthaben, graceful als ERROR markiert, kein Crash).
 MVP funktionsfähig bewiesen.
 
-Nächste Schritte (solide): severity-Labels, inline-Kommentare via gh API, caching.
+**Solide-Stufe ERLEDIGT (2026-08-27, v1.0.34):** severity-Labels (`--labels`),
+inline-Kommentare via GitHub GraphQL (`--inline`), und Ergebnis-Cache
+(`~/.idun/.review_cache.json`, `--no-cache` zum Deaktivieren). Siehe
+`idun/review_parse.py` + `idun/review_cache.py` + `tests/test_review.py`.
 

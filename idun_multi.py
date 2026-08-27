@@ -27,6 +27,8 @@ from idun import providers as P
 from idun import retro as R
 from idun import _cli_retro as UI
 from idun import verification as V
+from idun import review_parse as RP
+from idun import review_cache as RC
 
 # VERSION is imported, never copied: a hardcoded literal here read "0.2.6" while
 # the package was 1.0.22, so `idun-multi --version` and `idun-multi doctor` both
@@ -482,6 +484,147 @@ def _review_providers() -> list[str]:
     return pids[:3]  # max 3 contenders
 
 
+def _parse_pr_ref(pr: str, repo: str):
+    """Return (gh_repo, gh_pr) from a user-supplied PR reference."""
+    gh_repo = repo or "qapdex-maker/idun-sdk"
+    gh_pr = pr
+    if "#" in pr and "/" in pr:
+        gh_repo, _, num = pr.partition("#")
+        gh_pr = num
+    elif pr.startswith("http"):
+        import re
+        m = re.search(r"github\.com/([^/]+/[^/]+)/pull/(\d+)", pr)
+        if m:
+            gh_repo, gh_pr = m.group(1), m.group(2)
+    elif pr.isdigit() or (pr.startswith("#") and pr[1:].isdigit()):
+        gh_pr = pr.lstrip("#")
+    return gh_repo, gh_pr
+
+
+def _review_one_chunk(chunk: str, index: int, total: int,
+                      pids: list, use_cache: bool,
+                      repo: str, pr: str) -> str:
+    """Run the ensemble over one chunk; return the merged chunk text.
+
+    Caches the raw provider output unless ``use_cache`` is False.
+    """
+    if use_cache:
+        cached = RC.get(repo, pr, index, chunk)
+        if cached is not None:
+            return cached
+    review_prompt = (
+        "Du bist ein strenger Code-Reviewer. Finde nur echte Probleme: Bugs, "
+        "Security-Issues (Token-Leaks, Path-Traversal), Crashes, Dead-Code, "
+        "Regressionen. Ignoriere Style. Antworte pro Fund in EINER Zeile:\n"
+        "  [SEVERITY] pfad/datei.ext:ZEILE kurze Beschreibung\n"
+        "SEVERITY aus {HIGH, MEDIUM, LOW, INFO}. Wenn sauber: schreibe nur "
+        "'KEINE FUNDE'."
+    )
+    lines = []
+    for pid in pids:
+        try:
+            res = P.complete(pid, f"{review_prompt}\n\n"
+                                 f"--- DIFF CHUNK {index}/{total} ---\n{chunk}",
+                             max_tokens=600, timeout=150)
+            from typing import cast
+            res = cast("P.Completion", res)
+            lines.append(f"[{pid}] {res.text.strip()}")
+        except (RuntimeError, ValueError) as e:
+            lines.append(f"[{pid}] ERROR: {e}")
+    text = "\n".join(lines)
+    if use_cache:
+        RC.put(repo, pr, index, chunk, text)
+    return text
+
+
+def post_inline_comments(repo: str, pr: str, findings: list) -> tuple:
+    """Post findings as inline PR review comments via GitHub GraphQL.
+
+    Creates a PENDING review, adds one comment per finding that has a file +
+    line, then submits the review as a COMMENT. Returns (posted, failed).
+
+    We anchor on the PR head (``headRefOid``) and let GitHub resolve path+line
+    against the latest diff. Best-effort: an unresolvable position is skipped
+    (counted as failed) rather than aborting the whole review.
+    """
+    import subprocess
+
+    owner, name = repo.split("/")
+    q = """
+    query($owner:String!,$name:String!,$num:Int!){
+      repository(owner:$owner,name:$name){
+        pullRequest(number:$num){ id headRefOid }
+      }
+    }"""
+    try:
+        out = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={q}",
+             "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"num={int(pr)}"],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
+        print(R.status("err", f"Review-Query fehlgeschlagen: {e}"))
+        return 0, len(findings)
+    data = json.loads(out)
+    pr_id = data["data"]["repository"]["pullRequest"]["id"]
+    head = data["data"]["repository"]["pullRequest"]["headRefOid"]
+
+    mk = """
+    mutation($pid:ID!){ createPullRequestReview(input:{pullRequestId:$pid,
+      event:LINE_COMMENTS_ONLY }){ pullRequestReview { id } } }"""
+    try:
+        out = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={mk}", "-F", f"pid={pr_id}"],
+            capture_output=True, text=True, timeout=60, check=True,
+        ).stdout
+        review_id = json.loads(out)["data"]["createPullRequestReview"][
+            "pullRequestReview"]["id"]
+    except (subprocess.CalledProcessError, KeyError, ValueError) as e:
+        print(R.status("err", f"Review anlegen fehlgeschlagen: {e}"))
+        return 0, len(findings)
+
+    posted = 0
+    failed = 0
+    for f in findings:
+        if not f.file or f.line is None:
+            continue
+        add = """
+        mutation($rid:ID!,$body:String!,$path:String!,$line:Int!,$oid:GitObjectID!){
+          addPullRequestReviewComment(input:{pullRequestReviewId:$rid,
+            body:$body, path:$path, line:$line, commitOID:$oid}){
+            comment { id }
+          }
+        }"""
+        body = f"[{f.severity}] {f.message}" + (
+            f"  (via {f.source})" if f.source else "")
+        try:
+            subprocess.run(
+                ["gh", "api", "graphql", "-f", f"query={add}",
+                 "-F", f"rid={review_id}", "-F", f"body={body}",
+                 "-F", f"path={f.file}", "-F", f"line={f.line}",
+                 "-F", f"oid={head}"],
+                capture_output=True, text=True, timeout=60, check=True,
+            )
+            posted += 1
+        except (subprocess.CalledProcessError, ValueError):
+            failed += 1
+
+    sub = """
+    mutation($rid:ID!){
+      submitPullRequestReview(input:{pullRequestReviewId:$rid,
+        event:COMMENT, body:"idun-multi self-built review"}){
+        pullRequestReview { id }
+      }
+    }"""
+    try:
+        subprocess.run(["gh", "api", "graphql", "-f", f"query={sub}",
+                        "-F", f"rid={review_id}"],
+                       capture_output=True, text=True, timeout=60, check=True)
+    except (subprocess.CalledProcessError, ValueError) as e:
+        print(R.status("err", f"Review submit fehlgeschlagen: {e}"))
+    return posted, failed
+
+
 def cmd_review(args) -> int:
     """Self-built PR reviewer: diff -> race over providers -> post PR comment.
 
@@ -492,22 +635,8 @@ def cmd_review(args) -> int:
     """
     import subprocess
 
-    pr = args.pr
     repo = args.repo or "qapdex-maker/idun-sdk"
-    # pr kann "#123", "123", "owner/repo#123" oder "https://.../pull/123" sein
-    gh_repo = repo
-    gh_pr = pr
-    if "#" in pr and "/" in pr:
-        gh_repo, _, num = pr.partition("#")
-        gh_pr = num
-    elif pr.startswith("http"):
-        # https://github.com/owner/repo/pull/123
-        import re
-        m = re.search(r"github\.com/([^/]+/[^/]+)/pull/(\d+)", pr)
-        if m:
-            gh_repo, gh_pr = m.group(1), m.group(2)
-    elif pr.isdigit() or (pr.startswith("#") and pr[1:].isdigit()):
-        gh_pr = pr.lstrip("#")
+    gh_repo, gh_pr = _parse_pr_ref(args.pr, repo)
 
     print(R.header("IDUN REVIEW", f"{gh_repo}#{gh_pr}"))
     # 1) diff holen
@@ -535,34 +664,72 @@ def cmd_review(args) -> int:
         return 1
     print(R.status("info", f"Ensemble: {', '.join(pids)}"))
 
-    review_prompt = (
-        "Du bist ein strenger Code-Reviewer. Finde nur echte Probleme: Bugs, "
-        "Security-Issues (Token-Leaks, Path-Traversal), Crashes, Dead-Code, "
-        "Regressionen. Ignoriere Style. Antworte kompakt, eine Zeile pro Fund, "
-        "mit Datei:Zeile falls erkennbar. Wenn sauber: 'KEINE FUNDE'."
-    )
-
-    comments = []
-    for idx, chunk in enumerate(chunks, 1):
-        full = f"{review_prompt}\n\n--- DIFF CHUNK {idx}/{len(chunks)} ---\n{chunk}"
-        lines = []
-        for pid in pids:
-            try:
-                res = P.complete(pid, full, max_tokens=600, timeout=150)
-                from typing import cast
-                res = cast("P.Completion", res)
-                lines.append(f"[{pid}] {res.text.strip()}")
-            except (RuntimeError, ValueError) as e:
-                lines.append(f"[{pid}] ERROR: {e}")
-        comments.append("\n".join(lines))
-
-    body = "## 🤖 idun-multi self-built review\n\n" + "\n\n---\n\n".join(comments)
+    # 3) ensemble over chunks (cached)
+    chunk_texts = [
+        _review_one_chunk(c, i + 1, len(chunks), pids,
+                          not args.no_cache, gh_repo, gh_pr)
+        for i, c in enumerate(chunks)
+    ]
+    body = "## \ud83e\udd16 idun-multi self-built review\n\n" + "\n\n---\n\n".join(chunk_texts)
     print()
-    print(R.header("REVIEW (lokal)", f"{len(comments)} chunk(s)"))
+    print(R.header("REVIEW (lokal)", f"{len(chunks)} chunk(s)"))
     print(body[:2000])
 
-    # 3) als PR-Comment posten
-    if args.post:
+    # 4) structured findings (union across providers)
+    findings: list[RP.Finding] = []
+    for ctext in chunk_texts:
+        for src_line in ctext.splitlines():
+            if src_line.startswith("["):
+                end = src_line.find("]")
+                if end != -1:
+                    provider = src_line[1:end]
+                    rest = src_line[end + 1:]
+                    fs = RP.parse_findings(rest)
+                    findings.extend(f.with_source(provider) for f in fs)
+                    continue
+            findings.extend(RP.parse_findings(src_line))
+    seen = set()
+    uniq: list[RP.Finding] = []
+    for f in findings:
+        key = (f.file, f.line, f.message.lower(), f.severity)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq.append(f)
+
+    if uniq:
+        print(R.header("FINDINGS", f"{len(uniq)} (max severity "
+                                f"{RP.max_severity(uniq)})"))
+        for f in uniq[:30]:
+            loc = f"{f.file}:{f.line}" if f.line is not None else f.file
+            print(R.status("warn", f"[{f.severity}] {loc} {f.message}"))
+    else:
+        print(R.status("ok", "KEINE FUNDE (sauber)."))
+
+    # 5) artifacts
+    if args.labels and (args.post or args.inline):
+        labels = RP.severity_to_labels(uniq)
+        if labels:
+            try:
+                subprocess.run(["gh", "pr", "edit", gh_pr, "--repo", gh_repo,
+                                "--add-label", ",".join(labels)],
+                               check=True, timeout=60, capture_output=True)
+                print(R.status("ok", f"Labels: {', '.join(labels)}"))
+            except subprocess.CalledProcessError as e:
+                print(R.status("err", f"Label-Set fehlgeschlagen: {e}"))
+    elif args.labels:
+        print(R.status("info", "Labels nur mit --post/--inline "
+                              "(--labels allein ist Trockenlauf-Vorschlag)."))
+
+    posted = failed = 0
+    if args.inline:
+        posted, failed = post_inline_comments(gh_repo, gh_pr, uniq)
+        if posted:
+            print(R.status("ok", f"{posted} Inline-Kommentar(e) gepostet."))
+        if failed:
+            print(R.status("warn", f"{failed} Inline-Kommentar(e) uebersprungen."))
+
+    if args.post and not args.inline:
         try:
             subprocess.run(["gh", "pr", "comment", gh_pr, "--repo", gh_repo,
                             "--body", body], check=True, timeout=60)
@@ -570,8 +737,9 @@ def cmd_review(args) -> int:
         except subprocess.CalledProcessError as e:
             print(R.status("err", f"Post fehlgeschlagen: {e}"))
             return 1
-    else:
-        print(R.status("info", "Trockenlauf (--post zum Veröffentlichen)."))
+    elif not args.post and not args.inline and not args.labels:
+        print(R.status("info", "Trockenlauf (--post zum PR-Comment, "
+                              "--inline fuer Inline-Comments, --labels fuer Labels)."))
     return 0
 
 
@@ -1050,6 +1218,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--repo", default="", help="owner/repo (default qapdex-maker/idun-sdk)")
     sp.add_argument("--post", action="store_true",
                     help="post the merged review as a PR comment (default: dry-run)")
+    sp.add_argument("--inline", action="store_true",
+                    help="post findings as inline PR review comments (GitHub GraphQL)")
+    sp.add_argument("--labels", action="store_true",
+                    help="add severity labels to the PR (needs --post or --inline)")
+    sp.add_argument("--no-cache", action="store_true",
+                    help="skip the on-disk review cache (re-run all providers)")
     sp.set_defaults(func=cmd_review)
 
     sp = sub.add_parser("cost", help="show the approximate list-price table")

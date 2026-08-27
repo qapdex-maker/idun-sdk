@@ -113,6 +113,8 @@ idun-multi cost                # token / cost estimate
 idun-multi doctor              # environment + credential audit
 idun-multi verify              # LIVE smoke-test configured providers
 idun-multi wizard              # pick the default LLM provider
+idun-multi review <pr> [--post] [--inline] [--labels] [--no-cache]
+                             # self-built PR reviewer (diff -> race -> artifacts)
 ```
 
 ### Live provider verification (`idun-multi verify`)
@@ -136,6 +138,24 @@ idun-multi verify                       # all providers with a credential
 idun-multi verify --providers openai,groq,anthropic
 ```
 
+
+### Self-built PR reviewer (`idun-multi review`)
+
+A self-hosted alternative to CodeRabbit (ROADMAP Open #4). It fetches the PR
+diff via `gh`, splits it into chunks, races them across up to 3 providers that
+have credentials, and turns the results into actionable artifacts:
+
+```text
+idun-multi review 123                      # dry-run, prints findings
+idun-multi review 123 --post              # also post a PR comment
+idun-multi review 123 --inline            # post inline comments (GraphQL)
+idun-multi review 123 --labels --post     # add severity labels to the PR
+idun-multi review 123 --no-cache          # re-run all providers
+```
+
+Findings are parsed into severity/file/line and deduplicated across providers.
+Chunk results are cached under `~/.idun/.review_cache.json` (no secrets) so
+repeat runs are cheap.
 ## Supported providers
 
 The `idun` CLI / `IdunClient` speak to any OpenAI-compatible endpoint plus the
