@@ -53,15 +53,21 @@ def test_explicit_backend_flag_still_wins(monkeypatch):
     assert res.text == "[openai] hello"
 
 
-def test_login_without_flag_uses_idun_backend(monkeypatch, capsys):
+def test_login_without_flag_uses_idun_backend(monkeypatch, tmp_path, capsys):
+    # O8/A1 fix: do NOT mock save_credential. Isolate the config dir and
+    # assert the token is actually persisted to disk (real behaviour, not
+    # "the function was called"). This is what let B2 (unwritable token)
+    # slip through before — the mock hid the broken write path.
     monkeypatch.setenv("IDUN_BACKEND", "hf")
     monkeypatch.setattr("sys.stdin", io.StringIO("hf_test_tok\n"))
-    called = {}
-    monkeypatch.setattr(cli, "save_credential",
-                        lambda p, tok: called.setdefault("tok", tok))
     # azure do_login must NOT run for hf
     monkeypatch.setattr(cli, "do_login",
                         lambda: (_ for _ in ()).throw(
                             AssertionError("azure login must not run for hf")))
+    # Isolate credential storage to a temp dir (never the real ~/.idun).
+    import idun.providers as P
+    monkeypatch.setattr(P, "CONFIG_DIR", str(tmp_path))
     cli.cmd_login(_fake_args(backend=None))
-    assert called.get("tok") == "hf_test_tok"
+    token_file = tmp_path / "hf.token"
+    assert token_file.is_file(), "login did not persist the hf token"
+    assert token_file.read_text(encoding="utf-8") == "hf_test_tok"

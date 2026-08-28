@@ -88,16 +88,14 @@ def test_cli_status_runs(capsys):
     assert "active backend" in err
 
 
-def test_cli_login_saves_via_provider_registry(monkeypatch, capsys):
-    saved = {}
-
-    def fake_save(p, tok):
-        saved["pid"] = p.id
-        saved["tok"] = tok
-        return "/tmp/fake"
-
-    monkeypatch.setattr(cli, "save_credential", fake_save)
+def test_cli_login_saves_via_provider_registry(monkeypatch, tmp_path, capsys):
+    # O8/A1 fix: do NOT mock save_credential. Isolate CONFIG_DIR and assert
+    # the token is really written for the chosen provider (hf). Mocking the
+    # saver only proved "it was called", hiding a broken write path.
+    import idun.providers as P
+    monkeypatch.setattr(P, "CONFIG_DIR", str(tmp_path))
     monkeypatch.setattr("sys.stdin", __import__("io").StringIO("hf_secret\n"))
     cli.cmd_login(argparse.Namespace(backend="hf"))
-    assert saved["pid"] == "hf"
-    assert saved["tok"] == "hf_secret"
+    token_file = tmp_path / "hf.token"
+    assert token_file.is_file(), "login did not persist the hf token"
+    assert token_file.read_text(encoding="utf-8") == "hf_secret"
