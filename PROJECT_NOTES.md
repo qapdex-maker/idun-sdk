@@ -1,7 +1,7 @@
 # PROJECT_NOTES — idun-sdk (qapdex-maker/idun-sdk)
 
-Geklont: 2026-08-27 (Stand main 4689772, "bump to 1.0.32"). Quelle der Wahrheit = GitHub,
-nicht PyPI. Lokaler Klon sync (ungepusht=0).
+Geklont: 2026-08-27, aktualisiert bis 2026-08-28 (Stand main 37ebaa9, Version 1.0.34).
+Quelle der Wahrheit = GitHub, nicht PyPI. Lokaler Klon = Remote (0 ahead, 0 behind).
 
 ## Architektur (zwei Tools, BEWUSST getrennt)
 - `idun` = Azure AI Foundry Client (Agent, Trajectory, Doc-Matrix, Packs, HF-Hub).

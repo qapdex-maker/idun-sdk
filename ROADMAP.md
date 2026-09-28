@@ -3,15 +3,15 @@
 Live status and forward plan for the Idun project. This document is the
 planning record; release-by-release detail lives in [CHANGELOG.md](./CHANGELOG.md).
 
-Status: **active.** Last updated 2026-08-22 (SDK 1.0.29).
+Status: **active.** Last updated 2026-08-28 (SDK 1.0.34).
 
 ---
 
 ## Status quo — shipped and live
 
-- **idun-sdk 1.0.29** on PyPI — stdlib-only Azure AI Foundry client + CLI and
-  the `idun-multi` 17-provider LLM console, plus the `idun-mcp` stdio server.
-  README (badges) and `idun/openapi.json` are kept in sync with `__version__`.
+- idun-sdk 1.0.34 auf GitHub main `37ebaa9`, Remote `origin/main` identisch.
+- 323 Tests grün, pytest exit 0, Version/OpenAPI konsistent.
+- Zwei getrennte Wizards, 17 Provider, `idun-multi verify` + `idun-multi review` + `idun race`.
 - **Two CLIs, two wizards** (intentionally separate): `idun` (Azure Foundry
   client) and `idun-multi` (multi-provider console). Each has its own
   first-run wizard; both write only `~/.idun/config.toml`.
