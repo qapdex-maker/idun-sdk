@@ -44,6 +44,17 @@ VORBEREITUNG (erledigt):
 - [x] MVP `idun-multi review <pr>` implementiert (diff → race → optional gh comment).
 Solide-Stufe (offen): severity-Labels, inline-Kommentare via gh API, caching.
 
+**Beleg für die Solide-Stufe, 2026-09-28:** PR dotnet/skills#1036 wurde mit
+`idun-multi review` gegen den echten Dotnet-Stand gelesen und danach von Hand
+verifiziert. Dabei hat sich gezeigt, dass der beste Fund **nicht** aus dem
+Review kam, sondern aus dem Nachmessen: `find plugins -type d -name 'sample*'`
+ist leer, also hatte kein Skill ein `sample/`-Verzeichnis, und die
+CONTRIBUTING-Qualitätsregeln verlangen ein Output-Contract am Skill-Ende. Beides
+im Review nicht genannt, beides nach dem Review umgesetzt. Lehre für die
+Tool-Entwicklung: der self-built Reviewer findet API-Nutzung, aber
+Repo-Konventionen muss man selbst nachschlagen — das ist die Kandidatur für
+den nächsten Automatismus.
+
 ## Reihenfolge (bis IGNITE)
 1. Item 2 (Matrix honesty) — ERLEDIGT (Vorbereitung), wartet nur auf Live-Flips.
 2. Item 3 (race smoke) — ERLEDIGT (Vorbereitung), CRASHES:0 bewiesen.
