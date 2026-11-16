@@ -1355,7 +1355,7 @@ def support_matrix_text() -> str:
     """Render the capability matrix as a Markdown table (no secrets)."""
     rows = support_matrix()
     head = ("| Provider | Transport | Streaming | Tools | Vision | JSON mode | "
-            "Declared | Live |\\n"
+            "Declared | Live |\n"
             "|---|---|---|---|---|---|---|---|")
     lines = [head]
     for r in rows:

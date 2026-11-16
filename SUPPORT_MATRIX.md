@@ -2,24 +2,25 @@
 
 Per-provider capability matrix. **Generated from the transports actually implemented in `idun/providers.py`** (via `idun.providers.support_matrix()`), so this never drifts from the code. Re-render with `idun-multi support`.
 
-| Provider | Transport | Streaming | Tools | Vision | JSON mode | Declared | Live |\n|---|---|---|---|---|---|---|---|
-| `azure` | azure | ✓ | — | — | ✓ | ✓ | ? |
-| `openai` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ? |
-| `anthropic` | anthropic | — | ✓ | ✓ | — | ✓ | ? |
-| `groq` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `openrouter` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ? |
-| `together` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `deepseek` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `mistral` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `gemini` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `xai` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `nous` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `hf` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ? |
-| `ollama` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `local` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `perplexity` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `fireworks` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
-| `novita` | openai | ✓ | ✓ | ✓ | ✓ | — | ? |
+| Provider | Transport | Streaming | Tools | Vision | JSON mode | Declared | Live |
+|---|---|---|---|---|---|---|---|
+| `azure` | azure | ✓ | — | — | ✓ | ✓ | ⊘ skip |
+| `openai` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ fail |
+| `anthropic` | anthropic | — | ✓ | ✓ | — | ✓ | ⊘ skip |
+| `groq` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `openrouter` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ live |
+| `together` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `deepseek` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `mistral` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `gemini` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `xai` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `nous` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `hf` | openai | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ live |
+| `ollama` | openai | ✓ | ✓ | ✓ | ✓ | — | ✗ fail |
+| `local` | openai | ✓ | ✓ | ✓ | ✓ | — | ✗ fail |
+| `perplexity` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `fireworks` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
+| `novita` | openai | ✓ | ✓ | ✓ | ✓ | — | ⊘ skip |
 
 ## What the columns mean
 

@@ -42,6 +42,17 @@ Status: **active.** Last updated 2026-08-28 (SDK 1.0.34).
 
 ## Open items (not release-blocking)
 
+> **Klarstellung 16.11.2026 (lokal verifiziert):** Diese Liste spiegelt den Stand
+> vom 28.08. und ist teils überholt. Der Code nutzt inzwischen
+> `idun.verification` mit `~/.idun/.verified.json` statt `_LIVE_TESTED`
+> (`idun/providers.py:1306–1371`; 0 Treffer für `_LIVE_TESTED`). Der lokale Log
+> enthält 2 `ok`, 3 `fail`, 12 `skipped` — Zählung ohne Token- oder Modellwerte.
+> Punkt 4 ist entschieden (self-built, MVP `idun-multi review` gepusht); offen
+> ist nur die Solide-Stufe. Neu gefunden: `support_matrix_text()` erzeugt ein
+> literales `\n` im Tabellenkopf; roter Test
+> `/data/data/com.termux/files/home/idun/idun-sdk/tests/test_support_matrix_render.py`
+> (1 failed, 1 passed). Bis zum Fix ist `SUPPORT_MATRIX.md` nicht aktuell.
+
 1. **HF token live confirmation** — the `router.huggingface.co/v1` migration
    (B7) is verified at the code-path level; a real live `idun hf` call with a
    genuine HF token is still pending (being tested on a second device).
@@ -54,7 +65,11 @@ Status: **active.** Last updated 2026-08-28 (SDK 1.0.34).
    researched (2026-08-21): Qodo Merge (pr-agent, OSS, self-host), Greptile
    (SaaS, deep context), Ellipsis (YAML pipeline, self-host-in-VPC), Bito
    (SaaS, agentic), Codacy (quality+security+AI), or a self-built CLI LLM
-   review. No decision yet — user choice.
+   review. **ERLEDIGT 16.11.2026:** Entscheidung self-built. Solide-Stufe ist umgesetzt
+  (Severity-Labels, Inline-Kommentare via GitHub GraphQL, Chunk-Cache) in
+  `idun_multi.py:504–625`, `idun/review_parse.py`, `idun/review_cache.py`;
+  abgesichert durch `tests/test_review.py` (im Gesamtlauf grün). Offen bleibt
+  nur die Repo-Konventionen-Automatik (Fund vom 28.09.).
 
 ---
 

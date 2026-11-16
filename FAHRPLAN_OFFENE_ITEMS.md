@@ -1,5 +1,13 @@
 # FAHRPLAN — idun-sdk offene Items (Vorbereitung bis IGNITE, November)
 
+**Klarstellung 16.11.2026:** Das Dokument ist eine Momentaufnahme vom 27.08.
+Der hier beschriebene Mechanismus `_LIVE_TESTED` existiert im Code nicht mehr
+(0 Treffer); Live-Zustände liegen jetzt in `~/.idun/.verified.json` via
+`idun.verification`. Lokal gezählt: 2 ok / 3 fail / 12 skipped. Die Zahl "3/17
+live" unten ist daher überholt. Der HF-Live-Punkt bleibt widersprüchlich: dieses
+Dokument meldet einen erfolgreichen Call am 27.08., `ROADMAP.md` (28.08.)
+weiterhin "pending" — ohne erneuten echten Token-Call nicht auflösbar.
+
 Stand: 2026-08-27. IGNITE ist erst im November — genug Zeit, alle offenen Items
 vorzubereiten. Dies ist der Vorbereitungs-Fahrplan (nicht alles braucht Live-Tokens).
 
@@ -42,7 +50,10 @@ VORBEREITUNG (erledigt):
 - [x] `docs/code-review-options.md` angelegt: Pro/Contra + detaillierter Vergleich
       self-built vs Qodo. Empfehlung self-built.
 - [x] MVP `idun-multi review <pr>` implementiert (diff → race → optional gh comment).
-Solide-Stufe (offen): severity-Labels, inline-Kommentare via gh API, caching.
+Solide-Stufe (**ERLEDIGT 16.11.2026**): severity-Labels, inline-Kommentare via
+GraphQL und Chunk-Cache sind in `idun_multi.py:504–625` + `idun/review_parse.py`
++ `idun/review_cache.py` umgesetzt und in `tests/test_review.py` abgesichert
+(Gesamtsuite grün mit venv zuerst im PATH).
 
 **Beleg für die Solide-Stufe, 2026-09-28:** PR dotnet/skills#1036 wurde mit
 `idun-multi review` gegen den echten Dotnet-Stand gelesen und danach von Hand
